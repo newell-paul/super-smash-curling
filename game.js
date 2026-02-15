@@ -62,7 +62,6 @@
   const centerIceRadiusExpanded = centerIceRadius + (greenRingRadiusExpanded - greenRingRadius);
   const lineY = {
     tee: sheet.houseY,
-    back: sheet.houseY + 6 * feetToPx,
     hog: sheet.houseY - 21 * feetToPx,
     out: sheet.top + sheet.height - 140,
   };
@@ -158,7 +157,6 @@
   let postEndInputLockUntil = 0;
   let currentEnd = 1;
   let winnerTeamIdx = null;
-  let winnerText = "";
   const allStones = [];
   const uiState = {
     gbLeft: -1,
@@ -189,6 +187,18 @@
   };
   const broomRightSprite = Object.assign(new Image(), { src: "images/broom-right.png" });
   const centerTargetImage = Object.assign(new Image(), { src: "images/score-header.png" });
+  const houseRingFillColors = [
+    "rgba(31, 104, 182, 0.72)",
+    "rgba(255, 255, 255, 0.64)",
+    "rgba(31, 168, 79, 0.72)",
+    "rgba(255, 255, 255, 0.74)",
+  ];
+  const houseRingEdgeColors = [
+    "rgba(109, 168, 199, 0.55)",
+    "rgba(109, 168, 199, 0.38)",
+    "rgba(43, 108, 176, 0.8)",
+    "rgba(43, 108, 176, 0.8)",
+  ];
 
   const minLaunchVY = 4.8;
   const maxLaunchVY = 14.6;
@@ -482,24 +492,12 @@
     c.lineTo(laneRight, lineY.hog);
     c.stroke();
 
-    const colors = [
-      "rgba(31, 104, 182, 0.72)",
-      "rgba(255, 255, 255, 0.64)",
-      "rgba(31, 168, 79, 0.72)",
-      "rgba(255, 255, 255, 0.74)",
-    ];
-    const edgeColors = [
-      "rgba(109, 168, 199, 0.55)",
-      "rgba(109, 168, 199, 0.38)",
-      "rgba(43, 108, 176, 0.8)",
-      "rgba(43, 108, 176, 0.8)",
-    ];
     for (let i = 0; i < house.rings.length; i += 1) {
       c.beginPath();
-      c.fillStyle = colors[i];
+      c.fillStyle = houseRingFillColors[i];
       c.arc(house.x, house.y, house.rings[i], 0, Math.PI * 2);
       c.fill();
-      c.strokeStyle = edgeColors[i];
+      c.strokeStyle = houseRingEdgeColors[i];
       c.lineWidth = 1;
       c.stroke();
     }
@@ -552,14 +550,6 @@
     c.stroke();
 
     c.restore();
-  }
-
-  function stoneStyle(color) {
-    return {
-      fillStyle: color,
-      strokeStyle: "#243b45",
-      lineWidth: 2,
-    };
   }
 
   function drawStonesOverlay() {
@@ -666,10 +656,6 @@
     Composite.add(world, stone);
     allStones.push(stone);
     return stone;
-  }
-
-  function currentTeam() {
-    return teams[nextTeamIdx];
   }
 
   function clampAimX(x) {
@@ -905,13 +891,10 @@
       done = true;
       if (teams[0].score > teams[1].score) {
         winnerTeamIdx = 0;
-        winnerText = `${teams[0].short} WINS`;
       } else if (teams[1].score > teams[0].score) {
         winnerTeamIdx = 1;
-        winnerText = `${teams[1].short} WINS`;
       } else {
         winnerTeamIdx = null;
-        winnerText = "DRAW";
       }
       updateUi(`${scoredMsg} Match finished.`);
       return;
@@ -940,13 +923,10 @@
     done = true;
     if (teams[0].score > teams[1].score) {
       winnerTeamIdx = 0;
-      winnerText = `${teams[0].short} WINS`;
     } else if (teams[1].score > teams[0].score) {
       winnerTeamIdx = 1;
-      winnerText = `${teams[1].short} WINS`;
     } else {
       winnerTeamIdx = null;
-      winnerText = "DRAW";
     }
     updateUi(`${scoredMsg} Match finished.`);
   }
@@ -1025,7 +1005,6 @@
     done = false;
     postEndInputLockUntil = performance.now() + 900;
     winnerTeamIdx = null;
-    winnerText = "";
     uiState.gbLeft = -1;
     uiState.usaLeft = -1;
     uiState.gbScore = -1;
@@ -1039,7 +1018,6 @@
     const targetX = clampAimX(e.clientX);
     // Dampen direct mouse/trackpad aim to reduce sensitivity.
     pointerTargetX += (targetX - pointerTargetX) * 0.18;
-    pointer.y = e.clientY;
   }
 
   // Use pointer events only to avoid duplicate mouse+pointer updates.

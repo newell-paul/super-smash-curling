@@ -1,4 +1,4 @@
-# Olympic Curling (HTML5 + Matter.js) 
+# Super Smash Curling (HTML5 + Matter.js) 
 
 A playable browser-based curling proof of concept inspired by Winter Olympic curling.
 
@@ -115,3 +115,16 @@ If you do not want a `docs/` folder, you can also paste GitHub-hosted asset URLs
 - Matter.js is loaded from CDN in `index.html`.
 - If a browser blocks CDN scripts, allow network access for the page and reload.
 - This is a POC focused on playability and feel rather than full competition-rule coverage.
+
+## GitHub Pages
+
+This repo includes a GitHub Actions Pages workflow at `.github/workflows/pages.yml`.
+
+After pushing to GitHub:
+1. Open repository `Settings` -> `Pages`.
+2. Set `Source` to `GitHub Actions`.
+3. Push to `master` or `main`.
+
+Your game will be available at:
+
+`https://newell.paul.github.io/super-smash-curling/`
