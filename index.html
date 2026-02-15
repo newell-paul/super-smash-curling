@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Olympic Curling POC</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="titleScreen" class="title-screen" role="dialog" aria-label="Title screen">
+    </div>
+
+    <div class="hud">
+      <div class="hud-brand">
+        <img class="hud-header" src="images/score-header.png" alt="Olympic Curling" />
+      </div>
+      <div class="stones-table-wrap">
+        <table class="stones-table" aria-label="Stones left by team">
+          <thead>
+            <tr>
+              <th>Team</th>
+              <th class="score-head" aria-label="Score"></th>
+              <th>Stones</th>
+              <th class="end-head">End <span id="endBadge" class="end-badge">1</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><img class="flag" src="images/union-flag.png" alt="" aria-hidden="true" />GB</td>
+              <td id="gbScore" class="score-cell">0</td>
+              <td id="gbDots"></td>
+              <td class="end-cell-empty"></td>
+            </tr>
+            <tr>
+              <td><img class="flag" src="images/star-spangled-banner.png" alt="" aria-hidden="true" />USA</td>
+              <td id="gerScore" class="score-cell">0</td>
+              <td id="gerDots"></td>
+              <td class="end-cell-empty"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="controls-hint" aria-label="Controls">
+        <div class="controls-title">CONTROLS</div>
+        <span><kbd>←</kbd>/<kbd>→</kbd> Aim</span>
+        <span><kbd>Space</kbd> Hold power &amp; release</span>
+        <span><kbd>Space</kbd> Tap to Sweep!</span>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
+    <script>
+      if (!window.Matter) {
+        document.write('<script src="https://unpkg.com/matter-js@0.20.0/build/matter.min.js"><\\/script>');
+      }
+    </script>
+    <script src="game.js"></script>
+  </body>
+</html>

@@ -1,0 +1,540 @@
+:root {
+  --bg-ice: #dff5ff;
+  --ink: #142a33;
+  --hud-bg: rgba(255, 255, 255, 0.92);
+  --red: #d62828;
+  --yellow: #fcbf49;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  color: var(--ink);
+}
+
+body {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(185, 220, 239, 0.18), rgba(159, 208, 232, 0.18)),
+    url("images/ice.png") center / cover no-repeat fixed;
+}
+
+canvas {
+  display: block;
+  background: transparent !important;
+}
+
+.title-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: url("images/title-screen.png") center / cover no-repeat;
+  overflow: hidden;
+}
+
+.title-screen::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 78%;
+  width: min(44vw, 520px);
+  height: min(9vw, 96px);
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  pointer-events: none;
+  border-radius: 999px;
+  background:
+    radial-gradient(ellipse at center, rgba(255, 255, 255, 0.98) 0%, rgba(205, 238, 255, 0.72) 42%, rgba(150, 205, 245, 0.24) 64%, rgba(255, 255, 255, 0) 84%);
+  box-shadow:
+    0 0 28px rgba(195, 231, 255, 0.84),
+    0 0 56px rgba(165, 216, 250, 0.62);
+  animation: titlePromptPulse 1.7s ease-in-out infinite;
+}
+
+.title-screen::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 78%;
+  width: clamp(48px, 7vw, 98px);
+  height: clamp(48px, 7vw, 98px);
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  background: url("images/red-stone.png") center / contain no-repeat;
+  filter: drop-shadow(0 3px 8px rgba(18, 52, 72, 0.56));
+  pointer-events: none;
+  animation:
+    titlePromptPulse 1.7s ease-in-out infinite,
+    titleStoneSpin 6.5s linear infinite;
+}
+
+@keyframes titlePromptPulse {
+  0% { opacity: 0.18; }
+  28% { opacity: 1; }
+  66% { opacity: 1; }
+  100% { opacity: 0.18; }
+}
+
+@keyframes titleStoneSpin {
+  0% { transform: translate(-50%, -50%) rotate(0deg); }
+  100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.title-screen.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 260ms ease;
+}
+
+.title-content {
+  position: relative;
+  text-align: center;
+  color: #f5fbff;
+  text-transform: uppercase;
+  text-shadow: 0 3px 10px rgba(8, 35, 56, 0.45);
+}
+
+.title-content h1 {
+  margin: 18px 0 8px;
+  font-size: clamp(52px, 10vw, 106px);
+  font-family: "Georgia", "Times New Roman", serif;
+  font-style: italic;
+  letter-spacing: 1px;
+}
+
+.title-content p {
+  margin: 0;
+  font-size: clamp(18px, 2.8vw, 40px);
+  font-weight: 800;
+  letter-spacing: 1.2px;
+}
+
+.rings {
+  width: min(62vw, 460px);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  align-items: center;
+  justify-items: center;
+}
+
+.ring {
+  width: min(14vw, 110px);
+  height: min(14vw, 110px);
+  border: 10px solid #ffffff;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+}
+
+.ring.blue {
+  border-color: #0085c7;
+  grid-column: 1 / 3;
+}
+
+.ring.black {
+  border-color: #000000;
+  grid-column: 3 / 5;
+}
+
+.ring.red {
+  border-color: #df0024;
+  grid-column: 5 / 7;
+}
+
+.ring.yellow {
+  border-color: #f4c300;
+  grid-column: 2 / 4;
+  margin-top: -34%;
+}
+
+.ring.green {
+  border-color: #009f3d;
+  grid-column: 4 / 6;
+  margin-top: -34%;
+}
+
+.hud {
+  position: fixed;
+  top: 24px;
+  left: 12px;
+  width: 520px;
+  z-index: 5;
+  background:
+    linear-gradient(180deg, rgba(247, 253, 255, 0.88), rgba(233, 246, 252, 0.84)),
+    url("images/ice.png") center / cover no-repeat;
+  border: 2px solid #79aac3;
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 12px 28px rgba(8, 52, 74, 0.22);
+  backdrop-filter: blur(2px);
+  text-transform: uppercase;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease;
+}
+
+/* Consistent vertical spacing on all three left HUD sections. */
+.hud > .hud-brand { margin-top: 10px; }
+.hud > .stones-table-wrap,
+.hud > .controls-hint {
+  margin-top: 30px;
+}
+
+.hud.ready {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.hud p {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.stones-table-wrap {
+  margin-top: 0;
+  border: 1px solid #9ec0d2;
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(244, 251, 255, 0.78), rgba(226, 241, 249, 0.74)),
+    url("images/ice.png") center / cover no-repeat;
+  overflow: hidden;
+}
+
+.controls-hint {
+  margin-top: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(149, 184, 201, 0.7);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(238, 249, 255, 0.62), rgba(226, 241, 249, 0.56)),
+    url("images/ice.png") center / cover no-repeat;
+  background-blend-mode: normal;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #6d7880;
+  text-transform: none;
+}
+
+.controls-title {
+  font-family: "Avenir Next", "Trebuchet MS", "Segoe UI", sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: #5e6972;
+  text-align: center;
+}
+
+.controls-hint span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  justify-content: center;
+  text-align: center;
+}
+
+.hud-brand {
+  padding: 2px 2px 0;
+  border: 1px solid rgba(158, 192, 210, 0.75);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(244, 251, 255, 0.7), rgba(226, 241, 249, 0.66)),
+    url("images/ice.png") center / cover no-repeat;
+}
+
+.hud-header {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+}
+
+.hud-title {
+  font-family: "Georgia", "Times New Roman", serif;
+  font-size: 40px;
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: #244d64;
+  text-align: center;
+  text-transform: none;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.85),
+    0 3px 5px rgba(24, 63, 84, 0.22);
+}
+
+.hud-rings {
+  width: 206px;
+  height: 86px;
+  margin: 2px auto 0;
+  position: relative;
+}
+
+.hud-ring {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  --ring-base: #ffffff;
+  --ring-dark: #777777;
+  --ring-light: #ffffff;
+  border: 0;
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.75) 0 16%, transparent 30%),
+    radial-gradient(circle at 68% 76%, rgba(0, 0, 0, 0.28) 0 18%, transparent 34%),
+    conic-gradient(
+      from -34deg,
+      var(--ring-light) 0deg,
+      var(--ring-base) 85deg,
+      var(--ring-dark) 165deg,
+      var(--ring-base) 255deg,
+      var(--ring-light) 360deg
+    );
+  position: absolute;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
+  -webkit-mask: radial-gradient(circle, transparent 0 56%, #000 58% 100%);
+  mask: radial-gradient(circle, transparent 0 56%, #000 58% 100%);
+}
+
+.hud-ring::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 6px;
+  width: 30px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.52);
+  filter: blur(0.1px);
+  transform: rotate(-18deg);
+}
+
+.hud-ring.blue {
+  --ring-base: #0a6fd8;
+  --ring-dark: #084b95;
+  --ring-light: #4ea6ff;
+  left: 0;
+  top: 6px;
+}
+
+.hud-ring.black {
+  --ring-base: #2a2a2a;
+  --ring-dark: #111111;
+  --ring-light: #5b5b5b;
+  left: 66px;
+  top: 6px;
+}
+
+.hud-ring.red {
+  --ring-base: #ea1532;
+  --ring-dark: #a10e23;
+  --ring-light: #ff6b7f;
+  left: 132px;
+  top: 6px;
+}
+
+.hud-ring.yellow {
+  --ring-base: #f6be1a;
+  --ring-dark: #ab7e10;
+  --ring-light: #ffe07a;
+  left: 33px;
+  top: 34px;
+}
+
+.hud-ring.green {
+  --ring-base: #08a74a;
+  --ring-dark: #0a6d33;
+  --ring-light: #5fda90;
+  left: 99px;
+  top: 34px;
+}
+
+.stones-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  font-family: "Avenir Next", "Trebuchet MS", "Segoe UI", sans-serif;
+  color: #58646d;
+}
+
+.stones-table th,
+.stones-table td {
+  padding: 10px 10px;
+  border-bottom: 1px solid rgba(148, 181, 199, 0.5);
+  text-align: left;
+  background: transparent;
+}
+
+.stones-table thead th {
+  font-size: 18px;
+  font-weight: 800;
+  color: #5e6972;
+  background: linear-gradient(180deg, rgba(220, 239, 250, 0.95), rgba(205, 229, 241, 0.9));
+  letter-spacing: 0.2px;
+}
+
+.stones-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.stones-table tbody td:first-child {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  font-size: 24px;
+  font-weight: 700;
+  color: #5b6670;
+}
+
+.stones-table th:nth-child(2),
+.stones-table td.score-cell {
+  width: 28px;
+  text-align: center;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.stones-table th:nth-child(3),
+.stones-table td:nth-child(3) {
+  width: 230px;
+  padding-left: 10px;
+  padding-right: 0;
+  text-align: left;
+}
+
+.stones-table th:nth-child(4),
+.stones-table td.end-cell,
+.stones-table td.end-cell-empty {
+  width: 72px;
+  text-align: center;
+}
+
+.stones-table th.end-head {
+  font-size: 18px;
+  font-weight: 800;
+  color: #5e6972;
+  white-space: nowrap;
+}
+
+.end-badge {
+  display: inline-flex;
+  position: relative;
+  top: -2px;
+  align-items: center;
+  justify-content: center;
+  margin-left: 7px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 16px;
+  font-weight: 800;
+  color: #ffffff;
+  background: radial-gradient(circle at 32% 28%, #7ee49d 0%, #2fbf62 52%, #1f8e48 100%);
+  border: 1px solid rgba(24, 96, 50, 0.8);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.5),
+    0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+.end-cell-empty {
+  color: transparent;
+}
+
+.stones-table td.score-cell {
+  font-size: 21px;
+  font-weight: 800;
+  color: #ffffff;
+  background: linear-gradient(180deg, #2b6cb0, #1f5b99);
+  border-left: 1px solid rgba(123, 161, 190, 0.45);
+  border-right: 1px solid rgba(123, 161, 190, 0.45);
+}
+
+.stones-table th.score-head {
+  color: transparent;
+}
+
+.dots {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 3px;
+  min-height: 44px;
+  margin-left: 0;
+  transform: none;
+}
+
+.dot {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 0;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  box-shadow: 0 1px 2px rgba(20, 42, 54, 0.2);
+}
+
+.dot.red {
+  background-image: url("images/red-stone.png");
+}
+
+.dot.yellow {
+  background-image: url("images/yellow-stone.png");
+}
+
+.flag {
+  display: inline-block;
+  width: 44px;
+  height: 30px;
+  margin-right: 10px;
+  vertical-align: -5px;
+  border: 1px solid rgba(34, 57, 71, 0.28);
+  border-radius: 2px;
+  box-shadow: 0 1px 2px rgba(20, 42, 54, 0.16);
+}
+
+.flag-gb {
+  background-color: #012169;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 30'%3E%3Crect width='60' height='30' fill='%23012169'/%3E%3Cpath d='M0 0h9l51 25v5h-9L0 5z' fill='%23fff'/%3E%3Cpath d='M60 0v5L9 30H0v-5L51 0z' fill='%23fff'/%3E%3Cpath d='M0 0h6l54 26.5V30h-6L0 3.5z' fill='%23C8102E'/%3E%3Cpath d='M60 0v3.5L6 30H0v-3.5L54 0z' fill='%23C8102E'/%3E%3Cpath d='M25 0h10v30H25zM0 10h60v10H0z' fill='%23fff'/%3E%3Cpath d='M27 0h6v30h-6zM0 12h60v6H0z' fill='%23C8102E'/%3E%3C/svg%3E");
+  background-size: cover;
+  background-position: center;
+}
+
+.flag-usa {
+  background-color: #b22234;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 19 10'%3E%3Crect width='19' height='10' fill='%23b22234'/%3E%3Cg fill='%23fff'%3E%3Crect y='0.769' width='19' height='0.769'/%3E%3Crect y='2.307' width='19' height='0.769'/%3E%3Crect y='3.846' width='19' height='0.769'/%3E%3Crect y='5.384' width='19' height='0.769'/%3E%3Crect y='6.923' width='19' height='0.769'/%3E%3Crect y='8.461' width='19' height='0.769'/%3E%3C/g%3E%3Crect width='7.6' height='5.385' fill='%233c3b6e'/%3E%3Cg fill='%23fff'%3E%3Ccircle cx='0.65' cy='0.5' r='0.11'/%3E%3Ccircle cx='1.9' cy='0.5' r='0.11'/%3E%3Ccircle cx='3.15' cy='0.5' r='0.11'/%3E%3Ccircle cx='4.4' cy='0.5' r='0.11'/%3E%3Ccircle cx='5.65' cy='0.5' r='0.11'/%3E%3Ccircle cx='6.9' cy='0.5' r='0.11'/%3E%3Ccircle cx='1.275' cy='1.0' r='0.11'/%3E%3Ccircle cx='2.525' cy='1.0' r='0.11'/%3E%3Ccircle cx='3.775' cy='1.0' r='0.11'/%3E%3Ccircle cx='5.025' cy='1.0' r='0.11'/%3E%3Ccircle cx='6.275' cy='1.0' r='0.11'/%3E%3Ccircle cx='0.65' cy='1.5' r='0.11'/%3E%3Ccircle cx='1.9' cy='1.5' r='0.11'/%3E%3Ccircle cx='3.15' cy='1.5' r='0.11'/%3E%3Ccircle cx='4.4' cy='1.5' r='0.11'/%3E%3Ccircle cx='5.65' cy='1.5' r='0.11'/%3E%3Ccircle cx='6.9' cy='1.5' r='0.11'/%3E%3Ccircle cx='1.275' cy='2.0' r='0.11'/%3E%3Ccircle cx='2.525' cy='2.0' r='0.11'/%3E%3Ccircle cx='3.775' cy='2.0' r='0.11'/%3E%3Ccircle cx='5.025' cy='2.0' r='0.11'/%3E%3Ccircle cx='6.275' cy='2.0' r='0.11'/%3E%3Ccircle cx='0.65' cy='2.5' r='0.11'/%3E%3Ccircle cx='1.9' cy='2.5' r='0.11'/%3E%3Ccircle cx='3.15' cy='2.5' r='0.11'/%3E%3Ccircle cx='4.4' cy='2.5' r='0.11'/%3E%3Ccircle cx='5.65' cy='2.5' r='0.11'/%3E%3Ccircle cx='6.9' cy='2.5' r='0.11'/%3E%3Ccircle cx='1.275' cy='3.0' r='0.11'/%3E%3Ccircle cx='2.525' cy='3.0' r='0.11'/%3E%3Ccircle cx='3.775' cy='3.0' r='0.11'/%3E%3Ccircle cx='5.025' cy='3.0' r='0.11'/%3E%3Ccircle cx='6.275' cy='3.0' r='0.11'/%3E%3Ccircle cx='0.65' cy='3.5' r='0.11'/%3E%3Ccircle cx='1.9' cy='3.5' r='0.11'/%3E%3Ccircle cx='3.15' cy='3.5' r='0.11'/%3E%3Ccircle cx='4.4' cy='3.5' r='0.11'/%3E%3Ccircle cx='5.65' cy='3.5' r='0.11'/%3E%3Ccircle cx='6.9' cy='3.5' r='0.11'/%3E%3Ccircle cx='1.275' cy='4.0' r='0.11'/%3E%3Ccircle cx='2.525' cy='4.0' r='0.11'/%3E%3Ccircle cx='3.775' cy='4.0' r='0.11'/%3E%3Ccircle cx='5.025' cy='4.0' r='0.11'/%3E%3Ccircle cx='6.275' cy='4.0' r='0.11'/%3E%3Ccircle cx='0.65' cy='4.5' r='0.11'/%3E%3Ccircle cx='1.9' cy='4.5' r='0.11'/%3E%3Ccircle cx='3.15' cy='4.5' r='0.11'/%3E%3Ccircle cx='4.4' cy='4.5' r='0.11'/%3E%3Ccircle cx='5.65' cy='4.5' r='0.11'/%3E%3Ccircle cx='6.9' cy='4.5' r='0.11'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: cover;
+  background-position: center;
+}
+
+kbd {
+  background: #ecf5fa;
+  border: 1px solid #accddb;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
