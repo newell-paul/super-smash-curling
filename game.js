@@ -213,32 +213,69 @@
   function getIcePattern(ctx) {
     if (icePattern) return icePattern;
     const tile = document.createElement("canvas");
-    tile.width = 192;
-    tile.height = 192;
+    tile.width = 256;
+    tile.height = 256;
     const tc = tile.getContext("2d");
     if (!tc) return null;
 
-    // Base frosty grain.
-    tc.fillStyle = "rgba(255, 255, 255, 0.045)";
-    for (let i = 0; i < 1400; i += 1) {
+    // Pebble texture (characteristic of real curling ice).
+    tc.fillStyle = "rgba(200, 230, 248, 0.18)";
+    for (let i = 0; i < 800; i += 1) {
       const x = Math.random() * tile.width;
       const y = Math.random() * tile.height;
-      const s = 0.5 + Math.random() * 1.1;
+      const r = 1.0 + Math.random() * 2.4;
+      tc.beginPath();
+      tc.arc(x, y, r, 0, Math.PI * 2);
+      tc.fill();
+    }
+
+    // Fine frosty grain.
+    tc.fillStyle = "rgba(255, 255, 255, 0.12)";
+    for (let i = 0; i < 2000; i += 1) {
+      const x = Math.random() * tile.width;
+      const y = Math.random() * tile.height;
+      const s = 0.4 + Math.random() * 1.2;
       tc.fillRect(x, y, s, s);
     }
 
-    // Light directional scratches.
-    tc.strokeStyle = "rgba(140, 186, 214, 0.12)";
-    tc.lineWidth = 0.75;
-    for (let i = 0; i < 44; i += 1) {
+    // Directional scratches (near-horizontal curling marks).
+    tc.strokeStyle = "rgba(120, 170, 200, 0.28)";
+    tc.lineWidth = 0.8;
+    for (let i = 0; i < 65; i += 1) {
       const x = Math.random() * tile.width;
       const y = Math.random() * tile.height;
-      const len = 26 + Math.random() * 54;
-      const ang = -0.34 + Math.random() * 0.18;
+      const len = 20 + Math.random() * 70;
+      const ang = -0.3 + Math.random() * 0.15;
       tc.beginPath();
       tc.moveTo(x, y);
       tc.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len);
       tc.stroke();
+    }
+
+    // Cross scratches (from stone travel).
+    tc.strokeStyle = "rgba(140, 190, 218, 0.18)";
+    tc.lineWidth = 0.6;
+    for (let i = 0; i < 28; i += 1) {
+      const x = Math.random() * tile.width;
+      const y = Math.random() * tile.height;
+      const len = 30 + Math.random() * 90;
+      const ang = -1.5 + Math.random() * 0.3;
+      tc.beginPath();
+      tc.moveTo(x, y);
+      tc.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len);
+      tc.stroke();
+    }
+
+    // Frost patches.
+    for (let i = 0; i < 12; i += 1) {
+      const x = Math.random() * tile.width;
+      const y = Math.random() * tile.height;
+      const r = 10 + Math.random() * 22;
+      const grad = tc.createRadialGradient(x, y, 0, x, y, r);
+      grad.addColorStop(0, "rgba(255, 255, 255, 0.12)");
+      grad.addColorStop(1, "rgba(255, 255, 255, 0)");
+      tc.fillStyle = grad;
+      tc.fillRect(x - r, y - r, r * 2, r * 2);
     }
 
     icePattern = ctx.createPattern(tile, "repeat");
@@ -386,68 +423,126 @@
   ];
   Composite.add(world, boundaries);
 
-  function drawIceBase() {
-    const c = render.context;
-    c.save();
-    const texTop = Math.max(sheet.top, render.bounds.min.y - 24);
-    const texBottom = Math.min(sheet.top + sheet.height, render.bounds.max.y + 24);
-    const texHeight = texBottom - texTop;
-    if (texHeight <= 0) {
-      c.restore();
-      return;
-    }
-    const borderGrey = "rgba(98, 106, 114, 0.9)";
-    const borderBlue = sideWallColor;
-    const greyW = 9;
-    const blueW = 60;
+  // Pre-render ice strip to offscreen canvas (drawn once, blitted every frame).
+  const iceGrW = 9;
+  const iceBlW = 60;
+  const iceBorder = iceGrW + iceBlW + iceGrW;
+  const iceStripW = Math.ceil(sheet.width + iceBorder * 2);
+  const iceStripH = Math.ceil(sheet.height);
+  const iceStrip = document.createElement("canvas");
+  iceStrip.width = iceStripW;
+  iceStrip.height = iceStripH;
+  const iceStripCtx = iceStrip.getContext("2d");
+  if (iceStripCtx) {
+    const oL = iceBorder;
+    const oR = iceBorder + sheet.width;
+    const h = iceStripH;
+    const bGrey = "rgba(98, 106, 114, 0.9)";
 
-    // Side border stack (outside ice): grey -> blue -> grey on both sides.
-    c.fillStyle = borderGrey;
-    c.fillRect(laneLeft - (greyW + blueW + greyW), texTop, greyW, texHeight);
-    c.fillRect(laneLeft - greyW, texTop, greyW, texHeight);
-    c.fillRect(laneRight, texTop, greyW, texHeight);
-    c.fillRect(laneRight + greyW + blueW, texTop, greyW, texHeight);
+    // Left border: grey | blue | grey
+    iceStripCtx.fillStyle = bGrey;
+    iceStripCtx.fillRect(0, 0, iceGrW, h);
+    iceStripCtx.fillStyle = sideWallColor;
+    iceStripCtx.fillRect(iceGrW, 0, iceBlW, h);
+    iceStripCtx.fillStyle = bGrey;
+    iceStripCtx.fillRect(iceGrW + iceBlW, 0, iceGrW, h);
 
-    c.fillStyle = borderBlue;
-    c.fillRect(laneLeft - (greyW + blueW), texTop, blueW, texHeight);
-    c.fillRect(laneRight + greyW, texTop, blueW, texHeight);
+    // Right border: grey | blue | grey
+    iceStripCtx.fillStyle = bGrey;
+    iceStripCtx.fillRect(oR, 0, iceGrW, h);
+    iceStripCtx.fillStyle = sideWallColor;
+    iceStripCtx.fillRect(oR + iceGrW, 0, iceBlW, h);
+    iceStripCtx.fillStyle = bGrey;
+    iceStripCtx.fillRect(oR + iceGrW + iceBlW, 0, iceGrW, h);
 
-    // Lightweight ice base for high frame rate.
-    const iceGrad = c.createLinearGradient(laneLeft, 0, laneRight, 0);
+    // Ice gradient
+    const iceGrad = iceStripCtx.createLinearGradient(oL, 0, oR, 0);
     iceGrad.addColorStop(0, "#deeff8");
     iceGrad.addColorStop(0.5, "#ecf8ff");
     iceGrad.addColorStop(1, "#deeff8");
-    c.fillStyle = iceGrad;
-    c.strokeStyle = "rgba(98, 156, 188, 0.9)";
-    c.lineWidth = 3;
-    c.fillRect(laneLeft, texTop, sheet.width, texHeight);
+    iceStripCtx.fillStyle = iceGrad;
+    iceStripCtx.fillRect(oL, 0, sheet.width, h);
 
-    // Cached repeating ice texture (cheap): generated once and reused.
-    const pattern = getIcePattern(c);
-    if (pattern) {
-      c.save();
-      c.globalAlpha = 0.72;
-      c.fillStyle = pattern;
-      c.fillRect(laneLeft, texTop, sheet.width, texHeight);
-      c.restore();
+    // Ice texture overlay
+    const pat = getIcePattern(iceStripCtx);
+    if (pat) {
+      iceStripCtx.save();
+      iceStripCtx.globalAlpha = 0.9;
+      iceStripCtx.fillStyle = pat;
+      iceStripCtx.fillRect(oL, 0, sheet.width, h);
+      iceStripCtx.restore();
     }
 
-    c.beginPath();
-    c.moveTo(laneLeft, texTop);
-    c.lineTo(laneLeft, texBottom);
-    c.moveTo(laneRight, texTop);
-    c.lineTo(laneRight, texBottom);
-    if (texBottom >= sheet.top + sheet.height - 1) {
-      c.moveTo(laneLeft, sheet.top + sheet.height);
-      c.lineTo(laneRight, sheet.top + sheet.height);
+    // Large-scale frost glare bands (horizontal shimmer).
+    for (let i = 0; i < 18; i += 1) {
+      const by = Math.random() * h;
+      const bh = 40 + Math.random() * 120;
+      const grad = iceStripCtx.createLinearGradient(oL, by, oL, by + bh);
+      grad.addColorStop(0, "rgba(255, 255, 255, 0)");
+      grad.addColorStop(0.5, "rgba(240, 250, 255, " + (0.06 + Math.random() * 0.08) + ")");
+      grad.addColorStop(1, "rgba(255, 255, 255, 0)");
+      iceStripCtx.fillStyle = grad;
+      iceStripCtx.fillRect(oL, by, sheet.width, bh);
     }
-    c.stroke();
 
-    // Repaint inner grey strips to remove any blue seam from the ice edge stroke.
-    c.fillStyle = borderGrey;
-    c.fillRect(laneLeft - greyW, texTop, greyW, texHeight);
-    c.fillRect(laneRight, texTop, greyW, texHeight);
-    c.restore();
+    // Long scratch marks spanning the ice surface.
+    iceStripCtx.save();
+    iceStripCtx.beginPath();
+    iceStripCtx.rect(oL, 0, sheet.width, h);
+    iceStripCtx.clip();
+    for (let i = 0; i < 40; i += 1) {
+      const sx = oL + Math.random() * sheet.width;
+      const sy = Math.random() * h;
+      const len = 80 + Math.random() * 300;
+      const ang = -1.5 + Math.random() * 0.2;
+      iceStripCtx.strokeStyle = "rgba(160, 210, 235, " + (0.1 + Math.random() * 0.15) + ")";
+      iceStripCtx.lineWidth = 0.4 + Math.random() * 0.8;
+      iceStripCtx.beginPath();
+      iceStripCtx.moveTo(sx, sy);
+      iceStripCtx.lineTo(sx + Math.cos(ang) * len, sy + Math.sin(ang) * len);
+      iceStripCtx.stroke();
+    }
+    iceStripCtx.restore();
+
+    // Scattered frost sparkle spots.
+    for (let i = 0; i < 60; i += 1) {
+      const fx = oL + Math.random() * sheet.width;
+      const fy = Math.random() * h;
+      const fr = 3 + Math.random() * 8;
+      const sparkle = iceStripCtx.createRadialGradient(fx, fy, 0, fx, fy, fr);
+      sparkle.addColorStop(0, "rgba(255, 255, 255, " + (0.15 + Math.random() * 0.2) + ")");
+      sparkle.addColorStop(1, "rgba(255, 255, 255, 0)");
+      iceStripCtx.fillStyle = sparkle;
+      iceStripCtx.fillRect(fx - fr, fy - fr, fr * 2, fr * 2);
+    }
+
+    // Edge strokes
+    iceStripCtx.strokeStyle = "rgba(98, 156, 188, 0.9)";
+    iceStripCtx.lineWidth = 3;
+    iceStripCtx.beginPath();
+    iceStripCtx.moveTo(oL, 0);
+    iceStripCtx.lineTo(oL, h);
+    iceStripCtx.moveTo(oR, 0);
+    iceStripCtx.lineTo(oR, h);
+    iceStripCtx.moveTo(oL, h);
+    iceStripCtx.lineTo(oR, h);
+    iceStripCtx.stroke();
+
+    // Repaint inner grey to cover blue seam from edge stroke
+    iceStripCtx.fillStyle = bGrey;
+    iceStripCtx.fillRect(iceGrW + iceBlW, 0, iceGrW, h);
+    iceStripCtx.fillRect(oR, 0, iceGrW, h);
+  }
+
+  function drawIceBase() {
+    const c = render.context;
+    const texTop = Math.max(sheet.top, render.bounds.min.y - 24);
+    const texBottom = Math.min(sheet.top + sheet.height, render.bounds.max.y + 24);
+    const texHeight = texBottom - texTop;
+    if (texHeight <= 0) return;
+    const sy = texTop - sheet.top;
+    c.drawImage(iceStrip, 0, sy, iceStripW, texHeight,
+      laneLeft - iceBorder, texTop, iceStripW, texHeight);
   }
 
   function drawSheetDecor() {
