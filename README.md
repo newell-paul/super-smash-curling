@@ -1,19 +1,20 @@
-# Super Smash Curling (HTML5 + Matter.js) 
+# Super Smash Curling
 
 A playable browser-based curling proof of concept inspired by Winter Olympic curling.
 
-## Preview
 
-Add media files to the repo (or GitHub assets) and reference them here.
-
-Example:
+## Title page
 
 ![Title page Screenshot](docs/title.png)
+
+## Game play
+
 ![Gameplay Screenshot](docs/gameplay.png)
 
 Play game here!
 
 `https://newell.paul.github.io/super-smash-curling/`
+
 
 Version: `0.0.1`
 
