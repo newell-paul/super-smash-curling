@@ -122,7 +122,7 @@
     },
   });
 
-  const runner = Runner.create();
+  const runner = Runner.create({ delta: 1000 / 60, isFixed: true });
 
   let pointer = { x: W * 0.5, y: H * 0.42 };
   let pointerTargetX = W * 0.5;
@@ -616,7 +616,7 @@
     // Draw a small transparent broom sprite near the running stone.
     const bob = Math.sin(t * 2.2) * (5.2 + 3.2 * vigor);
     const sweepX = Math.sin(t * 2.8) * (10 + 10 * vigor);
-    const bw = 72 + 24 * vigor;
+    const bw = 90 + 30 * vigor;
     const bh = bw * (broomRightSprite.naturalHeight / broomRightSprite.naturalWidth);
     const bx = x + sweepX + 2;
     const by = y + stoneRadius * 2.5 + bob - 6;
@@ -1109,8 +1109,6 @@
 
   window.addEventListener("keydown", onKeyDown, { passive: false });
   window.addEventListener("keyup", onKeyUp, { passive: false });
-  document.addEventListener("keydown", onKeyDown, { passive: false });
-  document.addEventListener("keyup", onKeyUp, { passive: false });
 
   window.addEventListener("blur", () => {
     if (!gameStarted || done) return;
@@ -1125,8 +1123,6 @@
   });
 
   render.canvas.tabIndex = 0;
-  render.canvas.addEventListener("keydown", onKeyDown, { passive: false });
-  render.canvas.addEventListener("keyup", onKeyUp, { passive: false });
   render.canvas.focus();
   document.body.style.overscrollBehavior = "none";
 
@@ -1288,14 +1284,13 @@
       }
     }
 
-    const dt = (engine.timing.delta || 16.666) / 1000;
     for (const stone of allStones) {
       const speed = stoneSpeed(stone);
       if (speed < 0.03 || !stone.plugin.spinDir) continue;
       const speedNorm = Math.min(1, speed / 14);
       const spinRate =
         (3.8 + 8.4 * speedNorm) * (0.45 + 1.15 * stone.plugin.spinStrength);
-      stone.plugin.handleAngle += stone.plugin.spinDir * spinRate * dt;
+      stone.plugin.handleAngle += stone.plugin.spinDir * spinRate * frameDt;
       Body.setAngularVelocity(stone, stone.plugin.spinDir * spinRate * 0.28);
     }
 
