@@ -210,6 +210,7 @@ canvas {
   padding: 10px 10px;
   border-bottom: 1px solid rgba(148, 181, 199, 0.5);
   text-align: left;
+  vertical-align: middle;
   background: transparent;
 }
 
@@ -225,18 +226,25 @@ canvas {
   border-bottom: 0;
 }
 
-.stones-table tbody td:first-child {
+.stones-table tbody tr {
+  height: 56px;
+}
+
+.stones-table td.team-cell {
   display: flex;
   align-items: center;
+  gap: 10px;
   white-space: nowrap;
   font-size: 24px;
+  line-height: 1;
   font-weight: 700;
   color: #5b6670;
+  transform: translateY(2px);
 }
 
 .stones-table th:nth-child(2),
 .stones-table td.score-cell {
-  width: 28px;
+  width: 42px;
   text-align: center;
   padding-left: 4px;
   padding-right: 4px;
@@ -245,7 +253,7 @@ canvas {
 .stones-table th:nth-child(3),
 .stones-table td:nth-child(3) {
   width: 230px;
-  padding-left: 10px;
+  padding-left: 22px;
   padding-right: 0;
   text-align: left;
 }
@@ -262,6 +270,8 @@ canvas {
   font-weight: 800;
   color: #5e6972;
   white-space: nowrap;
+  position: relative;
+  left: -12px;
 }
 
 .end-badge {
@@ -290,6 +300,7 @@ canvas {
 
 .stones-table td.score-cell {
   font-size: 21px;
+  line-height: 1;
   font-weight: 800;
   color: #ffffff;
   background: linear-gradient(180deg, #2b6cb0, #1f5b99);
@@ -306,7 +317,7 @@ canvas {
   align-items: center;
   justify-content: flex-start;
   gap: 3px;
-  min-height: 44px;
+  min-height: 36px;
   margin-left: 0;
   transform: none;
 }
@@ -334,8 +345,9 @@ canvas {
   display: inline-block;
   width: 44px;
   height: 30px;
-  margin-right: 10px;
-  vertical-align: -5px;
+  margin-right: 0;
+  vertical-align: middle;
+  flex: 0 0 auto;
   border: 1px solid rgba(34, 57, 71, 0.28);
   border-radius: 2px;
   box-shadow: 0 1px 2px rgba(20, 42, 54, 0.16);
