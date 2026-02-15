@@ -37,7 +37,7 @@
   const topPad = 24;
   const bottomPad = 24;
   const hudLeft = 12;
-  const hudWidth = 520;
+  const hudWidth = Math.min(520, Math.max(320, Math.floor(W * 0.4)));
   const hudRight = hudLeft + hudWidth;
   const desiredSheetWidth = Math.min(525, W * 0.625);
   const rightAreaWidth = Math.max(240, W - hudRight);
@@ -102,6 +102,7 @@
   };
   const titleScreenEl = document.getElementById("titleScreen");
   const hudEl = document.querySelector(".hud");
+  if (hudEl) hudEl.style.width = hudWidth + "px";
 
   const engine = Engine.create({
     gravity: { x: 0, y: 0 },
@@ -207,6 +208,7 @@
   const powerRampDownMs = 1000;
   const powerCycleMs = powerRampUpMs + powerHoldMs + powerRampDownMs;
   const minReleaseCharge = 0.38;
+  const referenceDt = 1 / 60; // physics tuned at 60fps
 
   function getIcePattern(ctx) {
     if (icePattern) return icePattern;
@@ -648,7 +650,7 @@
       spinDir: 0,
       spinStrength: 0,
       handleAngle: 0,
-      hitDampingFrames: 0,
+      hitDampingTime: 0,
       releasedAt: 0,
     };
     Body.setMass(stone, 10);
@@ -1145,6 +1147,7 @@
     }
 
     const frameDt = Math.min(0.033, (engine.timing.delta || 16.666) / 1000);
+    const dtRatio = frameDt / referenceDt;
     if (!shotReleased) {
       const aimInput = (aimRightHeld ? 1 : 0) - (aimLeftHeld ? 1 : 0);
       if (aimInput !== 0) {
@@ -1152,7 +1155,7 @@
         pointerTargetX = clampAimX(pointerTargetX + aimInput * keyAimSpeed * frameDt);
       }
       const smoothing = aimInput !== 0 ? 0.2 : 0.32;
-      pointer.x = clampAimX(pointer.x + (pointerTargetX - pointer.x) * smoothing);
+      pointer.x = clampAimX(pointer.x + (pointerTargetX - pointer.x) * (1 - Math.pow(1 - smoothing, dtRatio)));
     }
 
     if (chargingStone && !shotReleased) {
@@ -1192,10 +1195,11 @@
         if (sweepBlocked) scrub = 0;
         const effectiveScrub = sweepBlocked || !sweepTouchActive ? 0 : scrub;
         // Smooth down-screen glide on ice: kill lateral drift, gently decay forward speed.
+        // All per-frame multipliers scaled by dtRatio for frame-rate independence.
         const sweepFactor = Math.min(1, effectiveScrub / 2.2);
-        let nextVX = v.x * 0.8;
-        const forwardFriction = 0.0036 * (1 - 0.05 * sweepFactor);
-        const glideRetention = 0.9976 + 0.00012 * sweepFactor;
+        let nextVX = v.x * Math.pow(0.8, dtRatio);
+        const forwardFriction = 0.0036 * (1 - 0.05 * sweepFactor) * dtRatio;
+        const glideRetention = Math.pow(0.9976 + 0.00012 * sweepFactor, dtRatio);
         let nextVY = Math.max(0, v.y * glideRetention - forwardFriction);
 
         // Subtle curl: direction depends on release side, strength scales with offset from center.
@@ -1209,10 +1213,10 @@
           lateCurl *
           forwardFactor;
         const curlDelta = Math.max(-maxCurlPerTick, Math.min(maxCurlPerTick, rawCurlDelta));
-        nextVX += curlDelta;
+        nextVX += curlDelta * dtRatio;
 
         if (effectiveScrub > 0.01) {
-          nextVY += 0.00022 * effectiveScrub;
+          nextVY += 0.00022 * effectiveScrub * dtRatio;
         }
         nextVX = Math.max(-1.2, Math.min(1.2, nextVX));
         nextVY = Math.max(0, nextVY);
@@ -1223,10 +1227,10 @@
           nextVY = 0;
         }
 
-        if (activeStone.plugin.hitDampingFrames > 0) {
-          nextVX *= 0.8;
-          nextVY *= 0.82;
-          activeStone.plugin.hitDampingFrames -= 1;
+        if (activeStone.plugin.hitDampingTime > 0) {
+          nextVX *= Math.pow(0.8, dtRatio);
+          nextVY *= Math.pow(0.82, dtRatio);
+          activeStone.plugin.hitDampingTime -= frameDt;
         }
 
         Body.setVelocity(activeStone, { x: nextVX, y: nextVY });
@@ -1235,7 +1239,7 @@
       const sweepTouchActive = performance.now() - lastSweepInputAt < sweepTapWindowMs;
       scrub *= isSweepBlockedForActiveStone()
         ? 0
-        : (sweepTouchActive ? 0.82 : 0.45);
+        : Math.pow(sweepTouchActive ? 0.82 : 0.45, dtRatio);
       maybeEndShot();
     }
 
@@ -1246,12 +1250,12 @@
       const speed = stoneSpeed(stone);
       if (speed < 0.001) continue;
 
-      let nextVX = v.x * 0.925;
-      let nextVY = Math.max(0, v.y * 0.998 - 0.0034);
-      if (stone.plugin.hitDampingFrames > 0) {
-        nextVX *= 0.955;
-        nextVY *= 0.965;
-        stone.plugin.hitDampingFrames -= 1;
+      let nextVX = v.x * Math.pow(0.925, dtRatio);
+      let nextVY = Math.max(0, v.y * Math.pow(0.998, dtRatio) - 0.0034 * dtRatio);
+      if (stone.plugin.hitDampingTime > 0) {
+        nextVX *= Math.pow(0.955, dtRatio);
+        nextVY *= Math.pow(0.965, dtRatio);
+        stone.plugin.hitDampingTime -= frameDt;
       }
       if (nextVY < 0.16 && Math.abs(nextVX) < 0.12) {
         nextVX = 0;
@@ -1298,10 +1302,10 @@
     const maxCameraY = Math.max(0, sheet.top + sheet.height - H - bottomPad);
     if (shotReleased && activeStone) {
       const desiredY = activeStone.position.y - H * 0.68;
-      cameraY += (desiredY - cameraY) * 0.09;
+      cameraY += (desiredY - cameraY) * (1 - Math.pow(1 - 0.09, dtRatio));
     } else if (cameraResetRequested) {
       // Smooth, slower return to hack/top for the next player's turn.
-      cameraY += (0 - cameraY) * 0.045;
+      cameraY += (0 - cameraY) * (1 - Math.pow(1 - 0.045, dtRatio));
       if (Math.abs(cameraY) < 1.2) {
         cameraY = 0;
         cameraResetRequested = false;
@@ -1311,7 +1315,7 @@
     } else if (awaitingAllStonesStop || awaitingNextShotReset || awaitingNextEndKey) {
       // After each shot, drift to the house so players can review current stone positions.
       const targetViewY = house.y - H * 0.58;
-      cameraY += (targetViewY - cameraY) * 0.03;
+      cameraY += (targetViewY - cameraY) * (1 - Math.pow(1 - 0.03, dtRatio));
     }
     cameraY = Math.max(0, Math.min(maxCameraY, cameraY));
     render.bounds.min.x = 0;
@@ -1338,8 +1342,8 @@
       Body.setVelocity(b, { x: bv.x * 0.74, y: Math.max(0, bv.y * 0.82) });
       Body.setAngularVelocity(a, a.angularVelocity * 0.76);
       Body.setAngularVelocity(b, b.angularVelocity * 0.76);
-      if (a.plugin) a.plugin.hitDampingFrames = 4;
-      if (b.plugin) b.plugin.hitDampingFrames = 4;
+      if (a.plugin) a.plugin.hitDampingTime = 4 / 60;
+      if (b.plugin) b.plugin.hitDampingTime = 4 / 60;
     }
   });
 
