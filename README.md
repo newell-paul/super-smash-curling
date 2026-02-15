@@ -2,6 +2,19 @@
 
 A playable browser-based curling proof of concept inspired by Winter Olympic curling.
 
+## Preview
+
+Add media files to the repo (or GitHub assets) and reference them here.
+
+Example:
+
+![Title page Screenshot](docs/title.png)
+![Gameplay Screenshot](docs/gameplay.png)
+
+Play game here!
+
+`https://newell.paul.github.io/super-smash-curling/`
+
 Version: `0.0.1`
 
 This project uses:
@@ -87,18 +100,6 @@ node --check game.js
     └── preview.gif.txt
 ```
 
-## Preview
-
-Add media files to the repo (or GitHub assets) and reference them here.
-
-Example:
-
-```md
-![Title page Screenshot](./docs/title.png)
-![Gameplay Screenshot](./docs/gameplay.png)
-
-```
-
 If you do not want a `docs/` folder, you can also paste GitHub-hosted asset URLs after upload.
 
 ## Roadmap
@@ -124,7 +125,3 @@ After pushing to GitHub:
 1. Open repository `Settings` -> `Pages`.
 2. Set `Source` to `GitHub Actions`.
 3. Push to `master` or `main`.
-
-Your game will be available at:
-
-`https://newell.paul.github.io/super-smash-curling/`
