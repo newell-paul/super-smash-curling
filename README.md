@@ -1,6 +1,6 @@
 # Super Smash Curling
 
-A playable browser-based curling proof of concept inspired by Winter Olympic curling.
+A playable browser-based curling proof of concept inspired by winter curling competition gameplay.
 
 
 ## Title page
