@@ -13,7 +13,7 @@ A playable browser-based curling proof of concept inspired by Winter Olympic cur
 
 Play game here!
 
-`https://newell.paul.github.io/super-smash-curling/`
+https://newell-paul.github.io/super-smash-curling/
 
 
 Version: `0.0.1`
