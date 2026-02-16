@@ -43,7 +43,7 @@
   const fittedSheetWidth = Math.min(525, Math.max(220, halfW - sheetBorderW * 2 - 24));
   // Sheet dimensions are fixed so physics behave identically on every screen.
   // Larger monitors simply show more of the sheet at once.
-  const sheetRefH = 1080;
+  const sheetRefH = 850;
   const sheet = {
     x: halfW + halfW * 0.5,
     width: fittedSheetWidth,
@@ -72,7 +72,7 @@
     y: sheet.houseY,
     rings: [blueRingRadius, whiteRingRadius, greenRingRadiusExpanded, centerIceRadiusExpanded],
   };
-  const lowerGreenY = lineY.tee + house.rings[0] + 200;
+  const lowerGreenY = lineY.tee + (lineY.tee - lineY.hog);
   const hackOffset = 0.65 * feetToPx;
   const logoTopY = sheet.top + 10;
   const logoH = sheet.width * (468 / 1060); // matches logo.png aspect ratio
@@ -211,7 +211,7 @@
   ];
 
   const minLaunchVY = 4.8;
-  const maxLaunchVY = 14.6;
+  const maxLaunchVY = 19.8;
   const powerRampUpMs = 1200;
   const powerHoldMs = 220;
   const powerRampDownMs = 1000;
@@ -360,10 +360,10 @@
         scrub > 0.08 &&
         sweepTouchActive &&
         !isSweepBlockedForActiveStone();
-      const sweepIntensity = sweepActive ? Math.min(1, scrub / 2.2) : 0;
-      sweepGain.gain.setTargetAtTime(0.08 * sweepIntensity, now, 0.05);
-      sweepFilter.frequency.setTargetAtTime(1500 + 900 * sweepIntensity, now, 0.07);
-      sweepFilter.Q.setTargetAtTime(0.8 + 0.8 * sweepIntensity, now, 0.08);
+      const sweepIntensity = sweepActive ? Math.min(1, scrub / 1.6) : 0;
+      sweepGain.gain.setTargetAtTime(0.35 * sweepIntensity, now, 0.03);
+      sweepFilter.frequency.setTargetAtTime(1200 + 1200 * sweepIntensity, now, 0.04);
+      sweepFilter.Q.setTargetAtTime(0.6 + 1.2 * sweepIntensity, now, 0.05);
     }
   }
 
@@ -1679,7 +1679,7 @@
       const sweepTouchActive = performance.now() - lastSweepInputAt < sweepTapWindowMs;
       scrub *= isSweepBlockedForActiveStone()
         ? 0
-        : Math.pow(sweepTouchActive ? 0.82 : 0.45, dtRatio);
+        : Math.pow(sweepTouchActive ? 0.92 : 0.6, dtRatio);
       maybeEndShot();
     }
 
