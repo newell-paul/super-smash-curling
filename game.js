@@ -1,6 +1,6 @@
 // Olympic Curling POC by Paul Newell and Codex - 2026 
 // 
-// Version: 0.0.1
+// Version: 0.0.2
 
 (() => {
   if (!window.Matter) {
@@ -155,6 +155,8 @@
   let allStoppedFrames = 0;
   let gameStarted = false;
   let done = false;
+  let aiActive = false;
+  let usaIsAI = true;
   let postEndInputLockUntil = 0;
   let currentEnd = 1;
   let winnerTeamIdx = null;
@@ -253,13 +255,13 @@
     }
 
     // Cross scratches (from stone travel).
-    tc.strokeStyle = "rgba(140, 190, 218, 0.18)";
-    tc.lineWidth = 0.6;
-    for (let i = 0; i < 28; i += 1) {
+    for (let i = 0; i < 55; i += 1) {
       const x = Math.random() * tile.width;
       const y = Math.random() * tile.height;
-      const len = 30 + Math.random() * 90;
+      const len = 40 + Math.random() * 120;
       const ang = -1.5 + Math.random() * 0.3;
+      tc.strokeStyle = "rgba(130, 185, 215, " + (0.22 + Math.random() * 0.18) + ")";
+      tc.lineWidth = 0.9 + Math.random() * 1.4;
       tc.beginPath();
       tc.moveTo(x, y);
       tc.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len);
@@ -490,13 +492,13 @@
     iceStripCtx.beginPath();
     iceStripCtx.rect(oL, 0, sheet.width, h);
     iceStripCtx.clip();
-    for (let i = 0; i < 40; i += 1) {
+    for (let i = 0; i < 70; i += 1) {
       const sx = oL + Math.random() * sheet.width;
       const sy = Math.random() * h;
-      const len = 80 + Math.random() * 300;
-      const ang = -1.5 + Math.random() * 0.2;
-      iceStripCtx.strokeStyle = "rgba(160, 210, 235, " + (0.1 + Math.random() * 0.15) + ")";
-      iceStripCtx.lineWidth = 0.4 + Math.random() * 0.8;
+      const len = 100 + Math.random() * 420;
+      const ang = -1.5 + Math.random() * 0.25;
+      iceStripCtx.strokeStyle = "rgba(145, 200, 228, " + (0.16 + Math.random() * 0.2) + ")";
+      iceStripCtx.lineWidth = 0.8 + Math.random() * 1.6;
       iceStripCtx.beginPath();
       iceStripCtx.moveTo(sx, sy);
       iceStripCtx.lineTo(sx + Math.cos(ang) * len, sy + Math.sin(ang) * len);
@@ -787,6 +789,7 @@
     pointerTargetX = clampAimX(pointerTargetX);
     pointer.x = clampAimX(pointer.x);
     updateUi("Aim with mouse or arrows. Hold Space to charge, release Space to throw.");
+    if (teamIdx === 1 && usaIsAI && !done) aiTakeTurn();
   }
 
   function releaseStone() {
@@ -849,6 +852,15 @@
     awaitingNextShotReset = true;
     cameraResetRequested = false;
     updateUi("Shot finished. Press Space to scroll back for next stone.");
+
+    // Auto-advance camera after AI shot so human doesn't need to press space.
+    if (shotTeamIdx === 1) {
+      setTimeout(() => {
+        if (awaitingNextShotReset && !cameraResetRequested) {
+          cameraResetRequested = true;
+        }
+      }, 1200);
+    }
   }
 
   function areAllStonesStopped() {
@@ -1100,6 +1112,7 @@
     allStoppedFrames = 0;
     cameraY = 0;
     done = false;
+    aiActive = false;
     postEndInputLockUntil = performance.now() + 900;
     winnerTeamIdx = null;
     uiState.gbLeft = -1;
@@ -1111,7 +1124,310 @@
     spawnNextStone();
   }
 
+  // ===== AI Opponent (USA / Team 1) =====
+
+  const usaLabelEl = document.getElementById("usaLabel");
+
+  function updateUsaLabel() {
+    if (usaLabelEl) usaLabelEl.textContent = usaIsAI ? "AI" : "P2";
+  }
+
+  function toggleUsaAI() {
+    usaIsAI = !usaIsAI;
+    updateUsaLabel();
+  }
+
+  function gaussianRandom(mean, stddev) {
+    const u1 = Math.random();
+    const u2 = Math.random();
+    const z = Math.sqrt(-2 * Math.log(u1 || 1e-10)) * Math.cos(2 * Math.PI * u2);
+    return mean + z * stddev;
+  }
+
+  function simulateStoppingY(vy) {
+    let y = hackY;
+    for (let i = 0; i < 5000; i++) {
+      y += vy;
+      vy = Math.max(0, vy * 0.9976 - 0.0036);
+      if (vy < 0.16) break;
+    }
+    return y;
+  }
+
+  function powerForTargetY(targetY) {
+    let lo = 0, hi = 1;
+    for (let i = 0; i < 30; i++) {
+      const mid = (lo + hi) / 2;
+      const vy = minLaunchVY + (maxLaunchVY - minLaunchVY) * Math.pow(Math.max(minReleaseCharge, mid), 1.05);
+      const stopY = simulateStoppingY(vy);
+      if (stopY < targetY) lo = mid;
+      else hi = mid;
+    }
+    return (lo + hi) / 2;
+  }
+
+  function simulateLateralDisplacement(aimX, power) {
+    const lateralNorm = (aimX - sheet.x) / ((sheet.width * 0.5) - stoneRadius - 10);
+    const limitedNorm = Math.max(-1, Math.min(1, lateralNorm));
+    const spinNorm = Math.max(-maxSpinInfluence, Math.min(maxSpinInfluence, limitedNorm));
+    const spinStrength = Math.abs(spinNorm);
+    const spinDir = spinNorm === 0 ? 0 : -Math.sign(spinNorm);
+    const offsetBoost = spinStrength * spinStrength;
+
+    let x = aimX;
+    let vx = 0;
+    let vy = minLaunchVY + (maxLaunchVY - minLaunchVY) *
+      Math.pow(Math.max(minReleaseCharge, Math.min(1, power)), 1.05);
+
+    for (let i = 0; i < 5000; i++) {
+      const speed = Math.sqrt(vx * vx + vy * vy);
+      if (speed < 0.001) break;
+      vx *= 0.8;
+      vy = Math.max(0, vy * 0.9976 - 0.0036);
+      const speedNorm = Math.min(1, speed / 8);
+      const lateCurl = 0.7 + 0.9 * (1 - speedNorm);
+      const forwardFactor = Math.min(1, Math.max(0, (vy - 0.35) / 2.6));
+      const rawCurlDelta = spinDir *
+        (0.006 + 0.024 * spinStrength + 0.012 * offsetBoost) *
+        lateCurl * forwardFactor;
+      const curlDelta = Math.max(-maxCurlPerTick, Math.min(maxCurlPerTick, rawCurlDelta));
+      vx += curlDelta;
+      vx = Math.max(-1.2, Math.min(1.2, vx));
+      vy = Math.max(0, vy);
+      if (vy < 0.16 && Math.abs(vx) < 0.12) break;
+      x += vx;
+    }
+    return x;
+  }
+
+  function aimXForTargetX(targetX, power) {
+    if (Math.abs(targetX - sheet.x) < 3) return sheet.x;
+    let lo = preReleaseLeftLimit;
+    let hi = preReleaseRightLimit;
+    for (let i = 0; i < 30; i++) {
+      const mid = (lo + hi) / 2;
+      const finalX = simulateLateralDisplacement(mid, power);
+      if (finalX < targetX) lo = mid;
+      else hi = mid;
+    }
+    return clampAimX((lo + hi) / 2);
+  }
+
+  function evaluateBoard() {
+    const buttonPos = { x: house.x, y: house.y };
+    const stones = allStones
+      .filter(s => s !== chargingStone)
+      .map(s => ({
+        body: s,
+        teamIdx: s.plugin.teamIdx,
+        dist: Vector.magnitude(Vector.sub(s.position, buttonPos)),
+        x: s.position.x,
+        y: s.position.y,
+      }))
+      .sort((a, b) => a.dist - b.dist);
+
+    const inHouse = stones.filter(s => s.dist - stoneRadius <= house.rings[0]);
+    const aiInHouse = inHouse.filter(s => s.teamIdx === 1);
+    const opponentInHouse = inHouse.filter(s => s.teamIdx === 0);
+    const opponentStones = stones.filter(s => s.teamIdx === 0);
+
+    const closestStone = inHouse.length > 0 ? inHouse[0] : null;
+    const weHoldShot = closestStone !== null && closestStone.teamIdx === 1;
+    const opponentHoldsShot = closestStone !== null && closestStone.teamIdx === 0;
+
+    let scoringTeam = null;
+    let scoringPoints = 0;
+    if (inHouse.length > 0) {
+      scoringTeam = inHouse[0].teamIdx;
+      const nearestOpp = inHouse.find(s => s.teamIdx !== scoringTeam);
+      const nearestOppDist = nearestOpp ? nearestOpp.dist : Infinity;
+      scoringPoints = inHouse.filter(
+        s => s.teamIdx === scoringTeam && s.dist < nearestOppDist
+      ).length;
+    }
+
+    return {
+      stones,
+      inHouse,
+      aiInHouse,
+      opponentInHouse,
+      opponentStones,
+      closestStone,
+      weHoldShot,
+      opponentHoldsShot,
+      scoringTeam,
+      scoringPoints,
+      aiStonesRemaining: stonesPerTeam - teams[1].count,
+      houseEmpty: inHouse.length === 0,
+    };
+  }
+
+  function selectStrategy(board) {
+    // 10% chance of strategic mistake — fall back to a simple draw.
+    if (Math.random() < 0.10) return "draw";
+    if (board.houseEmpty) return "draw";
+    if (board.opponentHoldsShot) return "takeout";
+    if (board.weHoldShot) {
+      if (board.opponentInHouse.length > 0) {
+        return Math.random() < 0.4 ? "freeze" : "draw";
+      }
+      if (board.aiStonesRemaining > 2 && Math.random() < 0.35) return "guard";
+      return "draw";
+    }
+    return "draw";
+  }
+
+  function calculateShot(strategy, board) {
+    let targetX, targetY, extraPower = 0, shouldSweep = false;
+
+    switch (strategy) {
+      case "draw": {
+        const angle = Math.random() * Math.PI * 2;
+        const radius = Math.random() * greenRingRadius * 0.6;
+        targetX = house.x + Math.cos(angle) * radius;
+        targetY = house.y + Math.sin(angle) * radius;
+        shouldSweep = Math.random() < 0.6;
+        break;
+      }
+      case "takeout": {
+        const target = board.opponentInHouse[0] || board.opponentStones[0];
+        if (target) {
+          targetX = target.x;
+          targetY = target.y;
+          extraPower = 0.08;
+          shouldSweep = Math.random() < 0.6;
+        } else {
+          targetX = house.x;
+          targetY = house.y;
+          shouldSweep = Math.random() < 0.6;
+        }
+        break;
+      }
+      case "guard": {
+        targetX = house.x + (Math.random() - 0.5) * 40;
+        targetY = lineY.hog + (house.y - lineY.hog) * 0.3;
+        shouldSweep = Math.random() < 0.4;
+        break;
+      }
+      case "freeze": {
+        const target = board.aiInHouse[0] || { x: house.x, y: house.y };
+        targetX = target.x + (Math.random() - 0.5) * 20;
+        targetY = target.y - stoneRadius * 2.5;
+        shouldSweep = Math.random() < 0.5;
+        break;
+      }
+      default: {
+        targetX = house.x;
+        targetY = house.y;
+        shouldSweep = Math.random() < 0.6;
+      }
+    }
+
+    let power = powerForTargetY(targetY);
+    power = Math.min(1, power + extraPower);
+    const aimX = aimXForTargetX(targetX, power);
+
+    return {
+      aimX: clampAimX(aimX + gaussianRandom(0, 12)),
+      power: Math.max(minReleaseCharge, Math.min(1, power + gaussianRandom(0, 0.04))),
+      shouldSweep,
+    };
+  }
+
+  function aiTakeTurn() {
+    aiActive = true;
+    aimLeftHeld = false;
+    aimRightHeld = false;
+
+    const thinkTime = 600 + Math.random() * 600;
+
+    setTimeout(() => {
+      if (done || !chargingStone) { aiActive = false; return; }
+
+      const board = evaluateBoard();
+      const strategy = selectStrategy(board);
+      const shot = calculateShot(strategy, board);
+
+      // Phase: Aim — smooth pointer slide to target.
+      const aimTime = 400 + Math.random() * 400;
+      const startX = pointer.x;
+      const aimStart = performance.now();
+
+      function animateAim() {
+        if (done || !chargingStone) { aiActive = false; return; }
+        const t = Math.min(1, (performance.now() - aimStart) / aimTime);
+        const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        pointerTargetX = startX + (shot.aimX - startX) * eased;
+        if (t < 1) { requestAnimationFrame(animateAim); return; }
+        pointerTargetX = shot.aimX;
+        beginCharge();
+      }
+
+      // Phase: Charge — hold space for calculated duration.
+      function beginCharge() {
+        if (done || !chargingStone || shotReleased) { aiActive = false; return; }
+        spaceHeld = true;
+        isCharging = true;
+        chargeStartAt = performance.now();
+        const chargeTime = shot.power * powerRampUpMs;
+        setTimeout(() => {
+          if (done || shotReleased) { aiActive = false; return; }
+          spaceHeld = false;
+          // beforeUpdate detects spaceHeld===false while isCharging and calls releaseStone().
+          if (shot.shouldSweep) setTimeout(beginSweep, 200);
+          else setTimeout(pollShotDone, 200);
+        }, chargeTime);
+      }
+
+      // Phase: Sweep — rapid taps while stone is moving fast enough.
+      function beginSweep() {
+        if (done || !activeStone || !shotReleased) { pollShotDone(); return; }
+        const sweepEnd = performance.now() + 800 + Math.random() * 600;
+        function tap() {
+          if (done || !activeStone || !shotReleased) { pollShotDone(); return; }
+          if (performance.now() > sweepEnd || stoneSpeed(activeStone) < 0.5) {
+            pollShotDone();
+            return;
+          }
+          if (!isSweepBlockedForActiveStone()) {
+            scrub = Math.max(0, Math.min(2.2, scrub + 0.5));
+            lastSweepInputAt = performance.now();
+          }
+          setTimeout(tap, 150);
+        }
+        tap();
+      }
+
+      // Phase: Wait for shot to fully resolve, then auto-advance.
+      function pollShotDone() {
+        function check() {
+          if (done) { aiActive = false; return; }
+          if (awaitingNextShotReset) {
+            // Camera reset is auto-triggered from completeShotAndAdvanceTurn.
+            aiActive = false;
+            return;
+          }
+          if (awaitingNextEndKey && !endFlashActive) {
+            setTimeout(() => {
+              if (done) { aiActive = false; return; }
+              if (pendingNextEndSetup) resetForNextEnd();
+              awaitingNextEndKey = false;
+              cameraResetRequested = true;
+              aiActive = false;
+            }, 1500);
+            return;
+          }
+          setTimeout(check, 100);
+        }
+        check();
+      }
+
+      requestAnimationFrame(animateAim);
+    }, thinkTime);
+  }
+
   function updatePointerFromEvent(e) {
+    if (aiActive) return;
     const targetX = clampAimX(e.clientX);
     // Dampen direct mouse/trackpad aim to reduce sensitivity.
     pointerTargetX += (targetX - pointerTargetX) * 0.18;
@@ -1131,6 +1447,11 @@
       restartMatchFromEnd();
       return;
     }
+    if (e.key === "Shift" && !aiActive) {
+      toggleUsaAI();
+      return;
+    }
+    if (aiActive) return;
     if (endFlashActive) return;
     if (performance.now() < postEndInputLockUntil) return;
     if (awaitingNextEndKey) {
@@ -1178,6 +1499,7 @@
 
   function onKeyUp(e) {
     if (!gameStarted || done) return;
+    if (aiActive) return;
     if (performance.now() < postEndInputLockUntil) return;
     if (e.code === "ArrowLeft") {
       e.preventDefault();
@@ -1319,8 +1641,8 @@
         }
 
         if (activeStone.plugin.hitDampingTime > 0) {
-          nextVX *= Math.pow(0.8, dtRatio);
-          nextVY *= Math.pow(0.82, dtRatio);
+          nextVX *= Math.pow(0.85, dtRatio);
+          nextVY *= Math.pow(0.87, dtRatio);
           activeStone.plugin.hitDampingTime -= frameDt;
         }
 
@@ -1344,8 +1666,8 @@
       let nextVX = v.x * Math.pow(0.925, dtRatio);
       let nextVY = Math.max(0, v.y * Math.pow(0.998, dtRatio) - 0.0034 * dtRatio);
       if (stone.plugin.hitDampingTime > 0) {
-        nextVX *= Math.pow(0.955, dtRatio);
-        nextVY *= Math.pow(0.965, dtRatio);
+        nextVX *= Math.pow(0.97, dtRatio);
+        nextVY *= Math.pow(0.98, dtRatio);
         stone.plugin.hitDampingTime -= frameDt;
       }
       if (nextVY < 0.16 && Math.abs(nextVX) < 0.12) {
@@ -1428,12 +1750,12 @@
       const bv = b.velocity;
       const impact = Vector.magnitude(Vector.sub(av, bv));
       playCollisionSound(impact);
-      Body.setVelocity(a, { x: av.x * 0.74, y: Math.max(0, av.y * 0.82) });
-      Body.setVelocity(b, { x: bv.x * 0.74, y: Math.max(0, bv.y * 0.82) });
+      Body.setVelocity(a, { x: av.x * 0.82, y: Math.max(0, av.y * 0.89) });
+      Body.setVelocity(b, { x: bv.x * 0.82, y: Math.max(0, bv.y * 0.89) });
       Body.setAngularVelocity(a, a.angularVelocity * 0.76);
       Body.setAngularVelocity(b, b.angularVelocity * 0.76);
-      if (a.plugin) a.plugin.hitDampingTime = 4 / 60;
-      if (b.plugin) b.plugin.hitDampingTime = 4 / 60;
+      if (a.plugin) a.plugin.hitDampingTime = 2 / 60;
+      if (b.plugin) b.plugin.hitDampingTime = 2 / 60;
     }
   });
 

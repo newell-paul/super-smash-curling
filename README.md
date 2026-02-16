@@ -16,7 +16,7 @@ Play game here!
 https://newell-paul.github.io/super-smash-curling/
 
 
-Version: `0.0.1`
+Version: `0.0.2`
 
 This project uses:
 - HTML/CSS for HUD and presentation
