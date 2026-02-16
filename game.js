@@ -1,6 +1,6 @@
 // Olympic Curling POC by Paul Newell and Codex - 2026 
 // 
-// Version: 0.3
+// Version: 0.4
 
 (() => {
   if (!window.Matter) {
@@ -198,13 +198,13 @@
   const broomRightSprite = Object.assign(new Image(), { src: "images/broom-right.png" });
   const centerTargetImage = Object.assign(new Image(), { src: "images/logo.png" });
   const houseRingFillColors = [
-    "rgba(31, 104, 182, 0.72)",
-    "rgba(255, 255, 255, 0.64)",
-    "rgba(31, 168, 79, 0.72)",
-    "rgba(255, 255, 255, 0.74)",
+    "rgba(210, 38, 38, 0.58)",
+    "rgba(255, 255, 255, 0.97)",
+    "rgba(36, 180, 85, 0.58)",
+    "rgba(255, 255, 255, 0.97)",
   ];
   const houseRingEdgeColors = [
-    "rgba(109, 168, 199, 0.55)",
+    "rgba(180, 50, 50, 0.55)",
     "rgba(109, 168, 199, 0.38)",
     "rgba(43, 108, 176, 0.8)",
     "rgba(43, 108, 176, 0.8)",
@@ -262,13 +262,13 @@
     }
 
     // Cross scratches (from stone travel).
-    for (let i = 0; i < 35; i += 1) {
+    for (let i = 0; i < 50; i += 1) {
       const x = Math.random() * tile.width;
       const y = Math.random() * tile.height;
-      const len = 30 + Math.random() * 90;
+      const len = 40 + Math.random() * 100;
       const ang = -1.5 + Math.random() * 0.3;
-      tc.strokeStyle = "rgba(140, 195, 220, " + (0.10 + Math.random() * 0.10) + ")";
-      tc.lineWidth = 0.5 + Math.random() * 0.8;
+      tc.strokeStyle = "rgba(130, 185, 215, " + (0.18 + Math.random() * 0.14) + ")";
+      tc.lineWidth = 0.7 + Math.random() * 1.0;
       tc.beginPath();
       tc.moveTo(x, y);
       tc.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len);
@@ -461,9 +461,8 @@
     const oL = iceBorder;
     const oR = iceBorder + sheet.width;
     const h = iceStripH;
-    const bGrey = "rgba(98, 106, 114, 0.9)";
-
     // Left border: grey | blue | grey
+    const bGrey = "rgba(108, 116, 124, 0.95)";
     iceStripCtx.fillStyle = bGrey;
     iceStripCtx.fillRect(0, 0, iceGrW, h);
     iceStripCtx.fillStyle = sideWallColor;
@@ -514,13 +513,13 @@
     iceStripCtx.beginPath();
     iceStripCtx.rect(oL, 0, sheet.width, h);
     iceStripCtx.clip();
-    for (let i = 0; i < 45; i += 1) {
+    for (let i = 0; i < 55; i += 1) {
       const sx = oL + Math.random() * sheet.width;
       const sy = Math.random() * h;
-      const len = 80 + Math.random() * 280;
+      const len = 100 + Math.random() * 350;
       const ang = -1.5 + Math.random() * 0.2;
-      iceStripCtx.strokeStyle = "rgba(155, 208, 232, " + (0.08 + Math.random() * 0.10) + ")";
-      iceStripCtx.lineWidth = 0.4 + Math.random() * 0.9;
+      iceStripCtx.strokeStyle = "rgba(145, 200, 228, " + (0.12 + Math.random() * 0.14) + ")";
+      iceStripCtx.lineWidth = 0.6 + Math.random() * 1.2;
       iceStripCtx.beginPath();
       iceStripCtx.moveTo(sx, sy);
       iceStripCtx.lineTo(sx + Math.cos(ang) * len, sy + Math.sin(ang) * len);
@@ -555,6 +554,7 @@
     // Repaint inner grey to cover blue seam from edge stroke
     iceStripCtx.fillStyle = bGrey;
     iceStripCtx.fillRect(iceGrW + iceBlW, 0, iceGrW, h);
+    iceStripCtx.fillStyle = bGrey;
     iceStripCtx.fillRect(oR, 0, iceGrW, h);
   }
 
@@ -606,13 +606,6 @@
     c.lineTo(laneRight, lineY.tee);
     c.stroke();
 
-    // Bottom red removal line (stones are removed only after crossing this).
-    c.strokeStyle = "#d45151";
-    c.lineWidth = 2;
-    c.beginPath();
-    c.moveTo(laneLeft, lineY.out);
-    c.lineTo(laneRight, lineY.out);
-    c.stroke();
 
     c.strokeStyle = "rgba(42, 157, 79, 0.45)";
     c.lineWidth = 9;
@@ -654,12 +647,12 @@
     // Visual aim limiters: keep these aligned with the actual pre-release clamp.
     // Aim limit markers: outward-facing blue arrows.
     const arrowY = hackY + 3;
-    const arrowH = 16;
-    const arrowW = 12;
-    const pulse = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(performance.now() * 0.005));
-    c.fillStyle = `rgba(220, 64, 64, ${(0.55 * pulse).toFixed(3)})`;
-    c.strokeStyle = `rgba(255, 186, 186, ${(0.66 * pulse).toFixed(3)})`;
-    c.lineWidth = 1;
+    const arrowH = 22;
+    const arrowW = 16;
+    const pulse = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(performance.now() * 0.005));
+    c.fillStyle = `rgba(220, 64, 64, ${(0.8 * pulse).toFixed(3)})`;
+    c.strokeStyle = `rgba(255, 186, 186, ${(0.85 * pulse).toFixed(3)})`;
+    c.lineWidth = 1.5;
 
     // Left arrow (points outward to the left).
     c.beginPath();

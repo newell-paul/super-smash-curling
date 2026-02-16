@@ -149,7 +149,7 @@ canvas {
 
 .hud-logo img {
   display: block;
-  width: 60%;
+  width: 90%;
   height: auto;
   margin: 0 auto;
   border-radius: 8px;
@@ -203,9 +203,10 @@ canvas {
 .controls-hint {
   margin-top: 0;
   padding: 8px 10px;
-  border: 1px solid rgba(149, 184, 201, 0.7);
+  border: 1px solid rgba(121, 170, 195, 0.5);
   border-radius: 10px;
-  background: transparent;
+  background: linear-gradient(180deg, rgba(90, 140, 175, 0.45), rgba(70, 120, 160, 0.4));
+  backdrop-filter: blur(6px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -213,7 +214,7 @@ canvas {
   gap: clamp(8px, 1.2vw, 14px);
   font-size: clamp(12px, 1.3vw, 15px);
   font-weight: 700;
-  color: #6d7880;
+  color: rgba(220, 245, 245, 0.95);
   text-transform: none;
 }
 
@@ -222,7 +223,7 @@ canvas {
   font-size: clamp(14px, 1.5vw, 18px);
   font-weight: 800;
   letter-spacing: 0.2px;
-  color: #5e6972;
+  color: rgba(240, 255, 255, 1);
   text-align: center;
 }
 
@@ -370,7 +371,7 @@ canvas {
   background-position: center;
   background-repeat: no-repeat;
   background-size: contain;
-  box-shadow: 0 1px 2px rgba(20, 42, 54, 0.2);
+  box-shadow: none;
 }
 
 .dot.red {
@@ -395,8 +396,9 @@ canvas {
 
 
 kbd {
-  background: #ecf5fa;
-  border: 1px solid #accddb;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(160, 195, 220, 0.4);
   border-radius: 4px;
   padding: 1px 6px;
+  color: inherit;
 }
