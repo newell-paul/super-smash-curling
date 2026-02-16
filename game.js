@@ -74,9 +74,7 @@
   };
   const lowerGreenY = lineY.tee + (lineY.tee - lineY.hog);
   const hackOffset = 0.65 * feetToPx;
-  const logoTopY = sheet.top + 10;
-  const logoH = sheet.width * (468 / 1060); // matches logo.png aspect ratio
-  const hackY = logoTopY + logoH + 30;
+  const hackY = sheet.top + 96;
   let startLineY = hackY + 160;
   const hackMarkWidth = 18;
   const leftHackX = house.x - 26 - hackOffset;
@@ -103,6 +101,8 @@
     gerDots: document.getElementById("gerDots"),
     gerScore: document.getElementById("gerScore"),
     endBadge: document.getElementById("endBadge"),
+    rowP1: document.getElementById("rowP1"),
+    rowP2: document.getElementById("rowP2"),
   };
   const titleScreenEl = document.getElementById("titleScreen");
   const hudEl = document.querySelector(".hud");
@@ -407,6 +407,21 @@
     hitNoise.stop(now + 0.035);
   }
 
+  function playBellSound() {
+    if (!audioCtx) return;
+    const now = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    osc.type = "square";
+    osc.frequency.setValueAtTime(220, now);
+    osc.frequency.exponentialRampToValueAtTime(120, now + 0.06);
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0.18, now);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+    osc.connect(g).connect(audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + 0.08);
+  }
+
   const laneLeft = sheet.x - sheet.width * 0.5;
   const laneRight = sheet.x + sheet.width * 0.5;
   const wallThickness = 80;
@@ -558,19 +573,7 @@
     const c = render.context;
     c.save();
 
-    // Large branding image at the top of the playfield, baked behind all decor.
-    if (centerTargetImage.complete && centerTargetImage.naturalWidth > 0) {
-      const imgW = sheet.width * 1.0;
-      const imgH = imgW * (centerTargetImage.naturalHeight / centerTargetImage.naturalWidth);
-      const imgX = sheet.x - imgW * 0.5;
-      const imgY = sheet.top + 10;
-      startLineY = Math.max(hackY + 160, imgY + imgH + 18);
-      c.globalAlpha = 0.45;
-      c.drawImage(centerTargetImage, imgX, imgY, imgW, imgH);
-      c.globalAlpha = 1;
-    }
-
-    // Transparent red start line underneath the logo.
+    // Transparent red start line.
     c.strokeStyle = "rgba(200, 32, 32, 0.28)";
     c.lineWidth = 5;
     c.beginPath();
@@ -653,8 +656,9 @@
     const arrowY = hackY + 3;
     const arrowH = 16;
     const arrowW = 12;
-    c.fillStyle = "rgba(220, 64, 64, 0.55)";
-    c.strokeStyle = "rgba(255, 186, 186, 0.66)";
+    const pulse = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(performance.now() * 0.005));
+    c.fillStyle = `rgba(220, 64, 64, ${(0.55 * pulse).toFixed(3)})`;
+    c.strokeStyle = `rgba(255, 186, 186, ${(0.66 * pulse).toFixed(3)})`;
     c.lineWidth = 1;
 
     // Left arrow (points outward to the left).
@@ -1048,28 +1052,43 @@
     const pointStones = scoringStones
       .filter((x) => x.team === winningTeam && x.dist + epsilon < nearestOpponentDist)
       .map((x) => x.stone);
-    winningTeam.score += points;
     const scoredMsg = `End ${currentEnd} complete. ${winningTeam.name} scores ${points}.`;
 
-    if (currentEnd < totalEnds) {
-      stageNextEnd(scoredMsg, pointStones);
-      return;
+    // Animate score: increment one point at a time with a bell sound.
+    let awarded = 0;
+    function tickScore() {
+      if (awarded >= points) {
+        // All points awarded — proceed with end/game flow.
+        if (currentEnd < totalEnds) {
+          stageNextEnd(scoredMsg, pointStones);
+        } else {
+          done = true;
+          if (teams[0].score > teams[1].score) {
+            winnerTeamIdx = 0;
+          } else if (teams[1].score > teams[0].score) {
+            winnerTeamIdx = 1;
+          } else {
+            winnerTeamIdx = null;
+          }
+          updateUi(`${scoredMsg} Match finished.`);
+        }
+        return;
+      }
+      winningTeam.score += 1;
+      awarded += 1;
+      playBellSound();
+      updateUi(scoredMsg);
+      setTimeout(tickScore, 500);
     }
-
-    done = true;
-    if (teams[0].score > teams[1].score) {
-      winnerTeamIdx = 0;
-    } else if (teams[1].score > teams[0].score) {
-      winnerTeamIdx = 1;
-    } else {
-      winnerTeamIdx = null;
-    }
-    updateUi(`${scoredMsg} Match finished.`);
+    tickScore();
   }
 
   function updateUi(statusText) {
     void statusText;
     updateStonesLeftTable();
+    // Highlight the active player's row.
+    if (ui.rowP1) ui.rowP1.classList.toggle("active-turn", nextTeamIdx === 0 && !done);
+    if (ui.rowP2) ui.rowP2.classList.toggle("active-turn", nextTeamIdx === 1 && !done);
   }
 
   function renderDots(el, count, dotClass) {
@@ -1100,11 +1119,21 @@
       uiState.usaLeft = usaLeft;
     }
     if (teams[0].score !== uiState.gbScore) {
-      if (ui.gbScore) ui.gbScore.textContent = String(teams[0].score);
+      if (ui.gbScore) {
+        ui.gbScore.textContent = String(teams[0].score);
+        ui.gbScore.classList.remove("pulse");
+        void ui.gbScore.offsetWidth;
+        ui.gbScore.classList.add("pulse");
+      }
       uiState.gbScore = teams[0].score;
     }
     if (teams[1].score !== uiState.usaScore) {
-      if (ui.gerScore) ui.gerScore.textContent = String(teams[1].score);
+      if (ui.gerScore) {
+        ui.gerScore.textContent = String(teams[1].score);
+        ui.gerScore.classList.remove("pulse");
+        void ui.gerScore.offsetWidth;
+        ui.gerScore.classList.add("pulse");
+      }
       uiState.usaScore = teams[1].score;
     }
     if (shownEnd !== uiState.endShown) {

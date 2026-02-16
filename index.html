@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Super Smash Curling</title>
+    <link rel="icon" type="image/png" href="images/favicon.png" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -13,6 +14,10 @@
     </div>
 
     <div class="hud">
+      <div class="hud-logo">
+        <img src="images/logo.png" alt="Super Smash Curling" />
+      </div>
+      <div class="end-indicator">End <span id="endBadge" class="end-badge">1</span> of 3</div>
       <div class="stones-table-wrap">
         <table class="stones-table" aria-label="Stones left by team">
           <thead>
@@ -20,21 +25,18 @@
               <th>Team</th>
               <th class="score-head" aria-label="Score"></th>
               <th>Stones</th>
-              <th class="end-head">End <span id="endBadge" class="end-badge">1</span></th>
             </tr>
           </thead>
           <tbody>
-            <tr>
+            <tr id="rowP1">
               <td class="team-cell"><img class="flag" src="images/union-flag.png" alt="" aria-hidden="true" />P1</td>
               <td id="gbScore" class="score-cell">0</td>
               <td id="gbDots"></td>
-              <td class="end-cell-empty"></td>
             </tr>
-            <tr>
+            <tr id="rowP2">
               <td class="team-cell"><img class="flag" src="images/star-spangled-banner.png" alt="" aria-hidden="true" /><span id="usaLabel">AI</span></td>
               <td id="gerScore" class="score-cell">0</td>
               <td id="gerDots"></td>
-              <td class="end-cell-empty"></td>
             </tr>
           </tbody>
         </table>

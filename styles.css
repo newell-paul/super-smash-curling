@@ -27,6 +27,15 @@ body {
     url("images/ice.png") center / cover no-repeat fixed;
 }
 
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(8, 32, 48, 0.3) 100%);
+}
+
 canvas {
   display: block;
   background: transparent !important;
@@ -116,8 +125,9 @@ canvas {
   display: flex;
   flex-direction: column;
   opacity: 0;
+  transform: translateX(-30px);
   pointer-events: none;
-  transition: opacity 220ms ease;
+  transition: opacity 400ms ease, transform 400ms ease;
 }
 
 /* Consistent vertical spacing on left HUD sections. */
@@ -128,7 +138,31 @@ canvas {
 
 .hud.ready {
   opacity: 1;
+  transform: translateX(0);
   pointer-events: auto;
+}
+
+.hud-logo {
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.hud-logo img {
+  display: block;
+  width: 60%;
+  height: auto;
+  margin: 0 auto;
+  border-radius: 8px;
+}
+
+.end-indicator {
+  text-align: center;
+  font-family: "Avenir Next", "Trebuchet MS", "Segoe UI", sans-serif;
+  font-size: clamp(14px, 1.5vw, 18px);
+  font-weight: 800;
+  color: #5e6972;
+  letter-spacing: 0.3px;
+  margin: 8px 0 6px;
 }
 
 .title-credit {
@@ -162,9 +196,7 @@ canvas {
   margin-top: 0;
   border: 1px solid #9ec0d2;
   border-radius: 12px;
-  background:
-    linear-gradient(180deg, rgba(244, 251, 255, 0.78), rgba(226, 241, 249, 0.74)),
-    url("images/ice.png") center / cover no-repeat;
+  background: transparent;
   overflow: hidden;
 }
 
@@ -173,10 +205,7 @@ canvas {
   padding: 8px 10px;
   border: 1px solid rgba(149, 184, 201, 0.7);
   border-radius: 10px;
-  background:
-    linear-gradient(180deg, rgba(238, 249, 255, 0.62), rgba(226, 241, 249, 0.56)),
-    url("images/ice.png") center / cover no-repeat;
-  background-blend-mode: normal;
+  background: transparent;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -208,6 +237,7 @@ canvas {
 
 .stones-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 14px;
   font-family: "Avenir Next", "Trebuchet MS", "Segoe UI", sans-serif;
@@ -227,8 +257,24 @@ canvas {
   font-size: clamp(14px, 1.5vw, 18px);
   font-weight: 800;
   color: #5e6972;
-  background: linear-gradient(180deg, rgba(220, 239, 250, 0.95), rgba(205, 229, 241, 0.9));
+  background: transparent;
   letter-spacing: 0.2px;
+}
+
+.stones-table thead th:nth-child(1) { width: 28%; }
+.stones-table thead th:nth-child(2) { width: 12%; }
+.stones-table thead th:nth-child(3) { width: 60%; }
+
+.stones-table tbody tr.active-turn td {
+  background: rgba(30, 100, 160, 0.25);
+}
+
+.stones-table tbody tr.active-turn td.score-cell {
+  background: linear-gradient(180deg, #2b6cb0, #1f5b99);
+}
+
+.stones-table tbody tr.active-turn td.team-cell {
+  box-shadow: inset 4px 0 0 rgba(60, 160, 220, 0.7);
 }
 
 .stones-table tbody tr:last-child td {
@@ -249,34 +295,16 @@ canvas {
 
 .stones-table th:nth-child(2),
 .stones-table td.score-cell {
-  width: 10%;
   text-align: center;
-  padding-left: 4px;
-  padding-right: 4px;
+  padding-left: 8px;
+  padding-right: 8px;
 }
 
 .stones-table th:nth-child(3),
 .stones-table td:nth-child(3) {
-  width: 46%;
   padding-left: clamp(8px, 1.8vw, 22px);
-  padding-right: 0;
+  padding-right: 8px;
   text-align: left;
-}
-
-.stones-table th:nth-child(4),
-.stones-table td.end-cell,
-.stones-table td.end-cell-empty {
-  width: 16%;
-  text-align: center;
-}
-
-.stones-table th.end-head {
-  font-size: 18px;
-  font-weight: 800;
-  color: #5e6972;
-  white-space: nowrap;
-  position: relative;
-  left: -12px;
 }
 
 .end-badge {
@@ -299,9 +327,6 @@ canvas {
     0 1px 2px rgba(0, 0, 0, 0.18);
 }
 
-.end-cell-empty {
-  color: transparent;
-}
 
 .stones-table td.score-cell {
   font-size: clamp(16px, 1.8vw, 21px);
@@ -317,19 +342,29 @@ canvas {
   color: transparent;
 }
 
+@keyframes scorePulse {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+.score-cell.pulse {
+  animation: scorePulse 450ms ease-out;
+}
+
 .dots {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 3px;
-  min-height: 36px;
+  gap: 5px;
+  min-height: 42px;
   margin-left: 0;
   transform: none;
 }
 
 .dot {
-  width: clamp(24px, 5.5vw, 36px);
-  height: clamp(24px, 5.5vw, 36px);
+  width: clamp(32px, 6.5vw, 44px);
+  height: clamp(32px, 6.5vw, 44px);
   border-radius: 50%;
   border: 0;
   background-position: center;
