@@ -1,6 +1,6 @@
 // Olympic Curling POC by Paul Newell and Codex - 2026 
 // 
-// Version: 0.0.2
+// Version: 0.3
 
 (() => {
   if (!window.Matter) {
@@ -36,19 +36,20 @@
   const renderPixelRatio = Math.min(2, window.devicePixelRatio || 1);
   const topPad = 24;
   const bottomPad = 24;
-  const hudLeft = 12;
-  const hudWidth = Math.min(520, Math.max(320, Math.floor(W * 0.4)));
-  const hudRight = hudLeft + hudWidth;
-  const desiredSheetWidth = Math.min(525, W * 0.625);
-  const rightAreaWidth = Math.max(240, W - hudRight);
-  const fittedSheetWidth = Math.min(desiredSheetWidth, Math.max(220, rightAreaWidth - 24));
-  const sideGap = Math.max(12, (rightAreaWidth - fittedSheetWidth) * 0.5);
+  // Split screen: HUD centered in left half, playfield centered in right half.
+  const halfW = Math.floor(W / 2);
+  const hudWidth = Math.min(520, Math.max(280, halfW - 32));
+  const sheetBorderW = 78; // grey(9) + blue(60) + grey(9) border per side
+  const fittedSheetWidth = Math.min(525, Math.max(220, halfW - sheetBorderW * 2 - 24));
+  // Sheet dimensions are fixed so physics behave identically on every screen.
+  // Larger monitors simply show more of the sheet at once.
+  const sheetRefH = 1080;
   const sheet = {
-    x: hudRight + sideGap + fittedSheetWidth * 0.5,
+    x: halfW + halfW * 0.5,
     width: fittedSheetWidth,
     top: topPad,
-    height: H * 4.2,
-    houseY: topPad + H * 3.05,
+    height: sheetRefH * 4.2,
+    houseY: topPad + sheetRefH * 3.05,
   };
 
   const twelveFootRadius = sheet.width * 0.38;
@@ -73,7 +74,10 @@
   };
   const lowerGreenY = lineY.tee + house.rings[0] + 200;
   const hackOffset = 0.65 * feetToPx;
-  const hackY = sheet.top + 96;
+  const logoTopY = sheet.top + 10;
+  const logoH = sheet.width * (468 / 1060); // matches logo.png aspect ratio
+  const hackY = logoTopY + logoH + 30;
+  let startLineY = hackY + 160;
   const hackMarkWidth = 18;
   const leftHackX = house.x - 26 - hackOffset;
   const rightHackX = house.x + 8 + hackOffset;
@@ -102,7 +106,10 @@
   };
   const titleScreenEl = document.getElementById("titleScreen");
   const hudEl = document.querySelector(".hud");
-  if (hudEl) hudEl.style.width = hudWidth + "px";
+  if (hudEl) {
+    hudEl.style.width = hudWidth + "px";
+    hudEl.style.left = Math.max(8, (halfW - hudWidth) / 2) + "px";
+  }
 
   const engine = Engine.create({
     gravity: { x: 0, y: 0 },
@@ -189,7 +196,7 @@
     yellow: Object.assign(new Image(), { src: "images/yellow-stone.png" }),
   };
   const broomRightSprite = Object.assign(new Image(), { src: "images/broom-right.png" });
-  const centerTargetImage = Object.assign(new Image(), { src: "images/score-header.png" });
+  const centerTargetImage = Object.assign(new Image(), { src: "images/logo.png" });
   const houseRingFillColors = [
     "rgba(31, 104, 182, 0.72)",
     "rgba(255, 255, 255, 0.64)",
@@ -255,13 +262,13 @@
     }
 
     // Cross scratches (from stone travel).
-    for (let i = 0; i < 55; i += 1) {
+    for (let i = 0; i < 35; i += 1) {
       const x = Math.random() * tile.width;
       const y = Math.random() * tile.height;
-      const len = 40 + Math.random() * 120;
+      const len = 30 + Math.random() * 90;
       const ang = -1.5 + Math.random() * 0.3;
-      tc.strokeStyle = "rgba(130, 185, 215, " + (0.22 + Math.random() * 0.18) + ")";
-      tc.lineWidth = 0.9 + Math.random() * 1.4;
+      tc.strokeStyle = "rgba(140, 195, 220, " + (0.10 + Math.random() * 0.10) + ")";
+      tc.lineWidth = 0.5 + Math.random() * 0.8;
       tc.beginPath();
       tc.moveTo(x, y);
       tc.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len);
@@ -492,13 +499,13 @@
     iceStripCtx.beginPath();
     iceStripCtx.rect(oL, 0, sheet.width, h);
     iceStripCtx.clip();
-    for (let i = 0; i < 70; i += 1) {
+    for (let i = 0; i < 45; i += 1) {
       const sx = oL + Math.random() * sheet.width;
       const sy = Math.random() * h;
-      const len = 100 + Math.random() * 420;
-      const ang = -1.5 + Math.random() * 0.25;
-      iceStripCtx.strokeStyle = "rgba(145, 200, 228, " + (0.16 + Math.random() * 0.2) + ")";
-      iceStripCtx.lineWidth = 0.8 + Math.random() * 1.6;
+      const len = 80 + Math.random() * 280;
+      const ang = -1.5 + Math.random() * 0.2;
+      iceStripCtx.strokeStyle = "rgba(155, 208, 232, " + (0.08 + Math.random() * 0.10) + ")";
+      iceStripCtx.lineWidth = 0.4 + Math.random() * 0.9;
       iceStripCtx.beginPath();
       iceStripCtx.moveTo(sx, sy);
       iceStripCtx.lineTo(sx + Math.cos(ang) * len, sy + Math.sin(ang) * len);
@@ -550,6 +557,26 @@
   function drawSheetDecor() {
     const c = render.context;
     c.save();
+
+    // Large branding image at the top of the playfield, baked behind all decor.
+    if (centerTargetImage.complete && centerTargetImage.naturalWidth > 0) {
+      const imgW = sheet.width * 1.0;
+      const imgH = imgW * (centerTargetImage.naturalHeight / centerTargetImage.naturalWidth);
+      const imgX = sheet.x - imgW * 0.5;
+      const imgY = sheet.top + 10;
+      startLineY = Math.max(hackY + 160, imgY + imgH + 18);
+      c.globalAlpha = 0.45;
+      c.drawImage(centerTargetImage, imgX, imgY, imgW, imgH);
+      c.globalAlpha = 1;
+    }
+
+    // Transparent red start line underneath the logo.
+    c.strokeStyle = "rgba(200, 32, 32, 0.28)";
+    c.lineWidth = 5;
+    c.beginPath();
+    c.moveTo(laneLeft, startLineY);
+    c.lineTo(laneRight, startLineY);
+    c.stroke();
 
     c.strokeStyle = "#71aecd";
     c.lineWidth = 2;
@@ -777,7 +804,7 @@
     pointerTargetX = sheet.x;
     pointer.x = sheet.x;
     const x = sheet.x;
-    const y = sheet.top + 96;
+    const y = hackY;
     chargingStone = createStone(team, x, y, teamIdx);
     activeStone = chargingStone;
     shotReleased = false;
@@ -853,8 +880,8 @@
     cameraResetRequested = false;
     updateUi("Shot finished. Press Space to scroll back for next stone.");
 
-    // Auto-advance camera after AI shot so human doesn't need to press space.
-    if (shotTeamIdx === 1) {
+    // Auto-advance camera when AI is involved (either AI just shot, or AI is up next).
+    if (shotTeamIdx === 1 || (nextTeamIdx === 1 && usaIsAI)) {
       setTimeout(() => {
         if (awaitingNextShotReset && !cameraResetRequested) {
           cameraResetRequested = true;
@@ -1770,69 +1797,44 @@
     c.save();
     if (chargingStone && !shotReleased && isCharging && spaceHeld) {
       const p = chargingStone.position;
-      const meterW = 16;
-      const meterH = 132;
-      const mx = p.x - meterW * 0.5;
+      const cx = p.x;
       const my = p.y + 34;
+      const maxH = startLineY - my;
       const level = Math.max(0, Math.min(1, charge));
-      const pointerY = my + 2 + (meterH - 4) * level;
+      const fillH = Math.max(4, maxH * level);
+      const topW = 6;
+      const botW = topW + 12 * level;
 
-      // Meter track.
-      c.fillStyle = "rgba(34, 76, 100, 0.22)";
-      c.strokeStyle = "rgba(176, 214, 235, 0.82)";
-      c.lineWidth = 1.6;
-      c.beginPath();
-      c.roundRect(mx, my, meterW, meterH, 5);
-      c.fill();
-      c.stroke();
-
-      // Color band so power levels are always visible.
-      const bandGrad = c.createLinearGradient(mx, my + 2, mx, my + meterH - 2);
+      // Growing tapered bar — narrow at top, widens toward bottom.
+      const bandGrad = c.createLinearGradient(0, my, 0, my + maxH);
       bandGrad.addColorStop(0, "rgba(255, 236, 74, 0.98)");
       bandGrad.addColorStop(0.52, "rgba(255, 160, 44, 0.98)");
       bandGrad.addColorStop(0.76, "rgba(246, 106, 48, 0.99)");
       bandGrad.addColorStop(0.9, "rgba(232, 58, 44, 1)");
       bandGrad.addColorStop(1, "rgba(198, 34, 34, 1)");
       c.fillStyle = bandGrad;
+      c.strokeStyle = "rgba(176, 214, 235, 0.72)";
+      c.lineWidth = 1.2;
       c.beginPath();
-      c.roundRect(mx + 2.2, my + 2.2, meterW - 4.4, meterH - 4.4, 4);
-      c.fill();
-
-      // Soft gloss to give the meter a cleaner, more polished look.
-      c.fillStyle = "rgba(255, 255, 255, 0.2)";
-      c.beginPath();
-      c.roundRect(mx + 2.8, my + 3.2, meterW - 8.2, (meterH - 8) * 0.42, 3);
-      c.fill();
-
-      // Pointer marker (color shifts with power).
-      const powerColor =
-        level < 0.5
-          ? "rgba(255, 190, 72, 0.98)"
-          : level < 0.82
-            ? "rgba(255, 124, 58, 0.98)"
-            : "rgba(226, 68, 52, 0.98)";
-      c.fillStyle = powerColor;
-      c.strokeStyle = "rgba(255, 255, 255, 0.7)";
-      c.lineWidth = 0.9;
-      c.beginPath();
-      c.moveTo(mx + meterW + 7, pointerY);
-      c.lineTo(mx + meterW + 1.5, pointerY - 4.5);
-      c.lineTo(mx + meterW + 1.5, pointerY + 4.5);
+      c.moveTo(cx - topW * 0.5, my);
+      c.lineTo(cx + topW * 0.5, my);
+      c.lineTo(cx + botW * 0.5, my + fillH);
+      c.lineTo(cx - botW * 0.5, my + fillH);
       c.closePath();
       c.fill();
       c.stroke();
 
-      // Downward tip at the end of the meter to indicate power direction.
-      c.fillStyle = "rgba(176, 214, 235, 0.86)";
-      c.strokeStyle = "rgba(255, 255, 255, 0.7)";
-      c.lineWidth = 1;
+      // Soft gloss highlight along left edge.
+      c.fillStyle = "rgba(255, 255, 255, 0.18)";
       c.beginPath();
-      c.moveTo(mx + meterW * 0.5, my + meterH + 8);
-      c.lineTo(mx + meterW * 0.5 - 4.5, my + meterH + 1.5);
-      c.lineTo(mx + meterW * 0.5 + 4.5, my + meterH + 1.5);
+      const glossBot = my + fillH * 0.4;
+      const glossBotW = topW + (botW - topW) * 0.4;
+      c.moveTo(cx - topW * 0.5, my);
+      c.lineTo(cx, my);
+      c.lineTo(cx - glossBotW * 0.5 + glossBotW * 0.45, glossBot);
+      c.lineTo(cx - glossBotW * 0.5, glossBot);
       c.closePath();
       c.fill();
-      c.stroke();
     }
 
     c.restore();

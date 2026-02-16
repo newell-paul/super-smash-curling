@@ -16,7 +16,7 @@ Play game here!
 https://newell-paul.github.io/super-smash-curling/
 
 
-Version: `0.0.2`
+Version: `0.3`
 
 This project uses:
 - HTML/CSS for HUD and presentation
@@ -86,7 +86,7 @@ node --check game.js
 ├── game.js                     # Main game logic, render, audio, physics
 ├── images/
 │   ├── title-screen.png
-│   ├── score-header.png
+│   ├── logo.png
 │   ├── winner.png
 │   ├── red-stone.png
 │   ├── yellow-stone.png
