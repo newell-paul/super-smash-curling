@@ -1065,7 +1065,7 @@
     pointerTargetX = clampAimX(pointerTargetX);
     pointer.x = clampAimX(pointer.x);
     for (const s of allStones) s.plugin.hitCount = 0;
-    updateUi(isMobile ? "" : "Aim with arrows. Space to charge & release. V to peek at house.");
+    updateUi("");
     const ta = document.getElementById("touchAction");
     if (ta) ta.textContent = "HOLD";
     if (teamIdx === 1 && usaIsAI && !done) aiTakeTurn();
@@ -1099,7 +1099,7 @@
     chargeStartAt = 0;
     chargingStone = null;
 
-    updateUi(isMobile ? "" : "Stone released. Tap Space rapidly to sweep.");
+    updateUi("");
   }
 
   function stoneSpeed(stone) {
@@ -1129,7 +1129,7 @@
 
     awaitingNextShotReset = true;
     cameraResetRequested = false;
-    updateUi(isMobile ? "" : "Shot finished. Press Space to scroll back for next stone.");
+    updateUi("");
 
     if (nextTeamIdx === 1 && usaIsAI) {
       setTimeout(() => {
@@ -1779,11 +1779,6 @@
       cameraResetRequested = true;
       return;
     }
-    if (e.key === "v" || e.key === "V") {
-      e.preventDefault();
-      houseViewHeld = true;
-      return;
-    }
     if (e.code === "ArrowLeft") {
       e.preventDefault();
       aimLeftHeld = true;
@@ -1824,10 +1819,6 @@
     if (!gameStarted || done) return;
     if (aiActive) return;
     if (performance.now() < postEndInputLockUntil) return;
-    if (e.key === "v" || e.key === "V") {
-      houseViewHeld = false;
-      return;
-    }
     if (e.code === "ArrowLeft") {
       e.preventDefault();
       aimLeftHeld = false;
@@ -2036,7 +2027,6 @@
         const downT = (phase - powerRampUpMs - powerHoldMs) / powerRampDownMs;
         charge = Math.max(0, 1 - downT);
       }
-      if (!isMobile) updateUi("Charging... release Space to throw.");
     }
 
     if (shotReleased && activeStone) {
