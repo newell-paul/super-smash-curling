@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#dff5ff" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Super Smash Curling</title>
     <link rel="icon" type="image/png" href="images/favicon.png" />
     <link rel="stylesheet" href="styles.css" />
@@ -17,7 +20,7 @@
       <div class="hud-logo">
         <img src="images/logo.png" alt="Super Smash Curling" />
       </div>
-      <div class="end-indicator">End <span id="endBadge" class="end-badge">1</span> of 3</div>
+      <div class="end-indicator">End <span id="endBadge" class="end-badge">1</span> of <span id="totalEndsBadge">5</span> <span id="hammerIndicator" class="hammer-badge" title="Last stone advantage">🔨 USA</span></div>
       <div class="stones-table-wrap">
         <table class="stones-table" aria-label="Stones left by team">
           <thead>
@@ -41,21 +44,10 @@
           </tbody>
         </table>
       </div>
-      <div class="controls-hint" aria-label="Controls">
-        <div class="controls-title">CONTROLS</div>
-        <span><kbd>←</kbd>/<kbd>→</kbd> Aim</span>
-        <span><kbd>Space</kbd> Hold power &amp; release</span>
-        <span><kbd>Space</kbd> Tap to Sweep!</span>
-        <span><kbd>Shift</kbd> Toggle AI / P2</span>
-      </div>
+      <div class="mode-toggle"><kbd>Shift</kbd> Toggle AI / P2</div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
-    <script>
-      if (!window.Matter) {
-        document.write('<script src="https://unpkg.com/matter-js@0.20.0/build/matter.min.js"><\\/script>');
-      }
-    </script>
+    <script src="vendor/matter.min.js"></script>
     <script src="game.js"></script>
   </body>
 </html>

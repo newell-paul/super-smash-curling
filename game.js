@@ -1,7 +1,3 @@
-// Olympic Curling POC by Paul Newell and Codex - 2026 
-// 
-// Version: 0.4
-
 (() => {
   if (!window.Matter) {
     const msg = document.createElement("div");
@@ -23,7 +19,6 @@
   const {
     Engine,
     Render,
-    Runner,
     Bodies,
     Body,
     Composite,
@@ -36,16 +31,16 @@
   const renderPixelRatio = Math.min(2, window.devicePixelRatio || 1);
   const topPad = 24;
   const bottomPad = 24;
-  // Split screen: HUD centered in left half, playfield centered in right half.
-  const halfW = Math.floor(W / 2);
-  const hudWidth = Math.min(520, Math.max(280, halfW - 32));
-  const sheetBorderW = 78; // grey(9) + blue(60) + grey(9) border per side
-  const fittedSheetWidth = Math.min(525, Math.max(220, halfW - sheetBorderW * 2 - 24));
-  // Sheet dimensions are fixed so physics behave identically on every screen.
-  // Larger monitors simply show more of the sheet at once.
+  const isMobile = W <= 768 || ("ontouchstart" in window && W < 1024);
+  const halfW = isMobile ? W : Math.floor(W / 2);
+  const hudWidth = Math.min(520, Math.max(280, (isMobile ? W : Math.floor(W / 2)) - 32));
+  const sheetBorderW = isMobile ? 32 : 78;
+  const fittedSheetWidth = isMobile
+    ? Math.min(525, Math.max(220, W - sheetBorderW * 2 - 16))
+    : Math.min(525, Math.max(220, halfW - sheetBorderW * 2 - 24));
   const sheetRefH = 850;
   const sheet = {
-    x: halfW + halfW * 0.5,
+    x: isMobile ? Math.floor(W / 2) : Math.floor(W / 2) + Math.floor(W / 4),
     width: fittedSheetWidth,
     top: topPad,
     height: sheetRefH * 4.2,
@@ -54,7 +49,7 @@
 
   const twelveFootRadius = sheet.width * 0.38;
   const feetToPx = twelveFootRadius / 6;
-  const stoneRadius = 20;
+  const stoneRadius = isMobile ? 16 : 20;
   const blueRingRadius = 6 * feetToPx;
   const whiteRingRadius = 4.5 * feetToPx;
   const greenRingRadius = 1.9 * feetToPx;
@@ -87,11 +82,14 @@
   const preReleaseLeftLimit = leftHackX + hackMarkWidth - curlLimiterExpand;
   const preReleaseRightLimit = rightHackX + curlLimiterExpand;
 
+  const miniMapCenterX = sheet.x;
+  const miniMapCenterY = startLineY + (H - startLineY) / 2;
+
   const teams = [
     { name: "Great Britain", short: "GB", color: "#d62828", count: 0, score: 0, dotClass: "red" },
     { name: "United States", short: "USA", color: "#fcbf49", count: 0, score: 0, dotClass: "yellow" },
   ];
-  const totalEnds = 3;
+  let totalEnds = 5;
   const stonesPerTeam = 6;
   const shotsPerEnd = stonesPerTeam * 2;
 
@@ -107,8 +105,12 @@
   const titleScreenEl = document.getElementById("titleScreen");
   const hudEl = document.querySelector(".hud");
   if (hudEl) {
-    hudEl.style.width = hudWidth + "px";
-    hudEl.style.left = Math.max(8, (halfW - hudWidth) / 2) + "px";
+    if (isMobile) {
+      hudEl.style.display = "none";
+    } else {
+      hudEl.style.width = hudWidth + "px";
+      hudEl.style.left = Math.max(8, (Math.floor(W / 2) - hudWidth) / 2) + "px";
+    }
   }
 
   const engine = Engine.create({
@@ -128,8 +130,6 @@
       pixelRatio: renderPixelRatio,
     },
   });
-
-  const runner = Runner.create({ delta: 1000 / 60, isFixed: true });
 
   let pointer = { x: W * 0.5, y: H * 0.42 };
   let pointerTargetX = W * 0.5;
@@ -159,7 +159,7 @@
   const endFlashCycleMs = 420;
   let cameraResetRequested = false;
   let awaitingAllStonesStop = false;
-  let allStoppedFrames = 0;
+  let allStoppedSince = 0;
   let gameStarted = false;
   let done = false;
   let aiActive = false;
@@ -175,6 +175,15 @@
     usaScore: -1,
     endShown: -1,
   };
+  let houseViewHeld = false;
+  let statusText = "";
+  let statusTextSetAt = 0;
+  let shakeX = 0;
+  let shakeY = 0;
+  let shakeIntensity = 0;
+  const particles = [];
+  const maxParticles = 40;
+  let hammerTeamIdx = 1;
   let audioCtx = null;
   let slideNoise = null;
   let slideFilter = null;
@@ -212,12 +221,12 @@
 
   const minLaunchVY = 4.8;
   const maxLaunchVY = 19.8;
-  const powerRampUpMs = 1200;
-  const powerHoldMs = 220;
-  const powerRampDownMs = 1000;
+  const powerRampUpMs = isMobile ? 2800 : 1200;
+  const powerHoldMs = isMobile ? 400 : 220;
+  const powerRampDownMs = isMobile ? 2000 : 1000;
   const powerCycleMs = powerRampUpMs + powerHoldMs + powerRampDownMs;
-  const minReleaseCharge = 0.38;
-  const referenceDt = 1 / 60; // physics tuned at 60fps
+  const minReleaseCharge = isMobile ? 0.15 : 0.38;
+  const referenceDt = 1 / 60;
 
   function getIcePattern(ctx) {
     if (icePattern) return icePattern;
@@ -227,7 +236,6 @@
     const tc = tile.getContext("2d");
     if (!tc) return null;
 
-    // Pebble texture (characteristic of real curling ice).
     tc.fillStyle = "rgba(200, 230, 248, 0.18)";
     for (let i = 0; i < 800; i += 1) {
       const x = Math.random() * tile.width;
@@ -238,7 +246,6 @@
       tc.fill();
     }
 
-    // Fine frosty grain.
     tc.fillStyle = "rgba(255, 255, 255, 0.12)";
     for (let i = 0; i < 2000; i += 1) {
       const x = Math.random() * tile.width;
@@ -247,7 +254,6 @@
       tc.fillRect(x, y, s, s);
     }
 
-    // Directional scratches (near-horizontal curling marks).
     tc.strokeStyle = "rgba(120, 170, 200, 0.28)";
     tc.lineWidth = 0.8;
     for (let i = 0; i < 65; i += 1) {
@@ -261,7 +267,6 @@
       tc.stroke();
     }
 
-    // Cross scratches (from stone travel).
     for (let i = 0; i < 50; i += 1) {
       const x = Math.random() * tile.width;
       const y = Math.random() * tile.height;
@@ -275,7 +280,6 @@
       tc.stroke();
     }
 
-    // Frost patches.
     for (let i = 0; i < 12; i += 1) {
       const x = Math.random() * tile.width;
       const y = Math.random() * tile.height;
@@ -447,7 +451,6 @@
   ];
   Composite.add(world, boundaries);
 
-  // Pre-render ice strip to offscreen canvas (drawn once, blitted every frame).
   const iceGrW = 9;
   const iceBlW = 60;
   const iceBorder = iceGrW + iceBlW + iceGrW;
@@ -461,7 +464,6 @@
     const oL = iceBorder;
     const oR = iceBorder + sheet.width;
     const h = iceStripH;
-    // Left border: grey | blue | grey
     const bGrey = "rgba(108, 116, 124, 0.95)";
     iceStripCtx.fillStyle = bGrey;
     iceStripCtx.fillRect(0, 0, iceGrW, h);
@@ -470,7 +472,6 @@
     iceStripCtx.fillStyle = bGrey;
     iceStripCtx.fillRect(iceGrW + iceBlW, 0, iceGrW, h);
 
-    // Right border: grey | blue | grey
     iceStripCtx.fillStyle = bGrey;
     iceStripCtx.fillRect(oR, 0, iceGrW, h);
     iceStripCtx.fillStyle = sideWallColor;
@@ -478,7 +479,6 @@
     iceStripCtx.fillStyle = bGrey;
     iceStripCtx.fillRect(oR + iceGrW + iceBlW, 0, iceGrW, h);
 
-    // Ice gradient
     const iceGrad = iceStripCtx.createLinearGradient(oL, 0, oR, 0);
     iceGrad.addColorStop(0, "#deeff8");
     iceGrad.addColorStop(0.5, "#ecf8ff");
@@ -486,7 +486,6 @@
     iceStripCtx.fillStyle = iceGrad;
     iceStripCtx.fillRect(oL, 0, sheet.width, h);
 
-    // Ice texture overlay
     const pat = getIcePattern(iceStripCtx);
     if (pat) {
       iceStripCtx.save();
@@ -496,7 +495,6 @@
       iceStripCtx.restore();
     }
 
-    // Large-scale frost glare bands (horizontal shimmer).
     for (let i = 0; i < 18; i += 1) {
       const by = Math.random() * h;
       const bh = 40 + Math.random() * 120;
@@ -508,7 +506,6 @@
       iceStripCtx.fillRect(oL, by, sheet.width, bh);
     }
 
-    // Long scratch marks spanning the ice surface.
     iceStripCtx.save();
     iceStripCtx.beginPath();
     iceStripCtx.rect(oL, 0, sheet.width, h);
@@ -527,7 +524,6 @@
     }
     iceStripCtx.restore();
 
-    // Scattered frost sparkle spots.
     for (let i = 0; i < 60; i += 1) {
       const fx = oL + Math.random() * sheet.width;
       const fy = Math.random() * h;
@@ -539,7 +535,6 @@
       iceStripCtx.fillRect(fx - fr, fy - fr, fr * 2, fr * 2);
     }
 
-    // Edge strokes
     iceStripCtx.strokeStyle = "rgba(98, 156, 188, 0.9)";
     iceStripCtx.lineWidth = 3;
     iceStripCtx.beginPath();
@@ -551,7 +546,6 @@
     iceStripCtx.lineTo(oR, h);
     iceStripCtx.stroke();
 
-    // Repaint inner grey to cover blue seam from edge stroke
     iceStripCtx.fillStyle = bGrey;
     iceStripCtx.fillRect(iceGrW + iceBlW, 0, iceGrW, h);
     iceStripCtx.fillStyle = bGrey;
@@ -573,16 +567,12 @@
     const c = render.context;
     c.save();
 
-    // Transparent red start line.
     c.strokeStyle = "rgba(200, 32, 32, 0.28)";
     c.lineWidth = 5;
     c.beginPath();
     c.moveTo(laneLeft, startLineY);
     c.lineTo(laneRight, startLineY);
     c.stroke();
-
-    c.strokeStyle = "#71aecd";
-    c.lineWidth = 2;
 
     c.strokeStyle = "rgba(136, 136, 136, 0.42)";
     c.lineWidth = 1.5;
@@ -598,7 +588,6 @@
     c.lineTo(laneRight, lowerGreenY);
     c.stroke();
 
-    // Thin center horizontal line through the target (tee line).
     c.strokeStyle = "rgba(136, 136, 136, 0.42)";
     c.lineWidth = 1.5;
     c.beginPath();
@@ -624,7 +613,6 @@
       c.stroke();
     }
 
-    // Center emblem inside the white button.
     if (centerTargetImage.complete && centerTargetImage.naturalWidth > 0) {
       const centerR = house.rings[3];
       const maxBox = centerR * 1.9;
@@ -644,8 +632,6 @@
       c.restore();
     }
 
-    // Visual aim limiters: keep these aligned with the actual pre-release clamp.
-    // Aim limit markers: outward-facing blue arrows.
     const arrowY = hackY + 3;
     const arrowH = 22;
     const arrowW = 16;
@@ -654,7 +640,6 @@
     c.strokeStyle = `rgba(255, 186, 186, ${(0.85 * pulse).toFixed(3)})`;
     c.lineWidth = 1.5;
 
-    // Left arrow (points outward to the left).
     c.beginPath();
     c.moveTo(preReleaseLeftLimit - arrowW, arrowY);
     c.lineTo(preReleaseLeftLimit, arrowY - arrowH * 0.5);
@@ -663,7 +648,6 @@
     c.fill();
     c.stroke();
 
-    // Right arrow (points outward to the right).
     c.beginPath();
     c.moveTo(preReleaseRightLimit + arrowW, arrowY);
     c.lineTo(preReleaseRightLimit, arrowY - arrowH * 0.5);
@@ -711,7 +695,6 @@
         );
         c.restore();
       } else {
-        // Fallback marker while sprite is loading.
         c.beginPath();
         c.fillStyle = team.color;
         c.arc(x, y, r, 0, Math.PI * 2);
@@ -734,7 +717,6 @@
     const t = performance.now() * 0.006;
     const vigor = Math.min(1, scrub / 2.2);
 
-    // Draw a small transparent broom sprite near the running stone.
     const bob = Math.sin(t * 2.2) * (5.2 + 3.2 * vigor);
     const sweepX = Math.sin(t * 2.8) * (10 + 10 * vigor);
     const bw = 90 + 30 * vigor;
@@ -748,6 +730,276 @@
     c.translate(bx, by);
     c.rotate(angle);
     c.drawImage(broomRightSprite, -bw * 0.5, -bh * 0.5, bw, bh);
+    c.restore();
+  }
+
+  function drawAimGuide() {
+    if (!chargingStone || shotReleased || aiActive) return;
+    const c = render.context;
+    const clampedX = clampAimX(pointer.x);
+    const lateralNorm = (clampedX - sheet.x) / ((sheet.width * 0.5) - stoneRadius - 10);
+    const limitedNorm = Math.max(-1, Math.min(1, lateralNorm));
+    const spinNorm = Math.max(-maxSpinInfluence, Math.min(maxSpinInfluence, limitedNorm));
+    const spinStrength = Math.abs(spinNorm);
+    const spinDir = spinNorm === 0 ? 0 : -Math.sign(spinNorm);
+    const offsetBoost = spinStrength * spinStrength;
+
+    let x = clampedX;
+    let vx = 0;
+    let vy = 8;
+    const points = [{ x, y: chargingStone.position.y }];
+    for (let i = 0; i < 300; i++) {
+      vx *= 0.8;
+      vy = Math.max(0, vy * 0.9976 - 0.0036);
+      const speed = Math.sqrt(vx * vx + vy * vy);
+      if (speed < 0.16) break;
+      const speedNorm = Math.min(1, speed / 8);
+      const lateCurl = 0.7 + 0.9 * (1 - speedNorm);
+      const forwardFactor = Math.min(1, Math.max(0, (vy - 0.35) / 2.6));
+      const rawCurl = spinDir * (0.006 + 0.024 * spinStrength + 0.012 * offsetBoost) * lateCurl * forwardFactor;
+      const curl = Math.max(-maxCurlPerTick, Math.min(maxCurlPerTick, rawCurl));
+      vx += curl;
+      x += vx;
+      points.push({ x, y: points[points.length - 1].y + vy });
+    }
+
+    c.save();
+    c.setLineDash([8, 12]);
+    c.strokeStyle = "rgba(200, 230, 255, 0.25)";
+    c.lineWidth = 2;
+    c.beginPath();
+    for (let i = 0; i < points.length; i++) {
+      if (i === 0) c.moveTo(points[i].x, points[i].y);
+      else c.lineTo(points[i].x, points[i].y);
+    }
+    c.stroke();
+    c.setLineDash([]);
+    c.restore();
+  }
+
+  function updateParticles(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vx *= 0.96;
+      p.vy *= 0.96;
+      p.life -= dt;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+  }
+
+  function spawnCollisionParticles(x, y, impact) {
+    const count = Math.min(12, Math.floor(3 + impact * 1.5));
+    for (let i = 0; i < count && particles.length < maxParticles; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 40 + Math.random() * 80 * Math.min(1, impact / 6);
+      particles.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 0.3 + Math.random() * 0.2,
+        maxLife: 0.5,
+      });
+    }
+  }
+
+  function drawParticles() {
+    if (!particles.length) return;
+    const c = render.context;
+    c.save();
+    for (const p of particles) {
+      const alpha = Math.max(0, p.life / p.maxLife) * 0.7;
+      const size = 2 + (1 - p.life / p.maxLife) * 2;
+      c.globalAlpha = alpha;
+      c.fillStyle = "#d0eaff";
+      c.beginPath();
+      c.arc(p.x, p.y, size, 0, Math.PI * 2);
+      c.fill();
+    }
+    c.restore();
+  }
+
+  function drawStatusOverlay() {
+    if (!statusText || done || isMobile) return;
+    const elapsed = performance.now() - statusTextSetAt;
+    const fadeIn = Math.min(1, elapsed / 300);
+    const c = render.context;
+    c.save();
+    const pr = renderPixelRatio;
+    c.setTransform(pr, 0, 0, pr, 0, 0);
+    c.globalAlpha = fadeIn * 0.85;
+    c.font = "bold 15px 'Trebuchet MS', sans-serif";
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    const tx = W / 2;
+    const ty = isTouchDevice ? H - 140 : H - 30;
+    const metrics = c.measureText(statusText);
+    const pw = metrics.width + 28;
+    const ph = 30;
+    const rx = tx - pw / 2;
+    const ry = ty - ph / 2;
+    const r = 10;
+    c.fillStyle = "rgba(10, 30, 50, 0.75)";
+    c.beginPath();
+    c.moveTo(rx + r, ry);
+    c.lineTo(rx + pw - r, ry);
+    c.quadraticCurveTo(rx + pw, ry, rx + pw, ry + r);
+    c.lineTo(rx + pw, ry + ph - r);
+    c.quadraticCurveTo(rx + pw, ry + ph, rx + pw - r, ry + ph);
+    c.lineTo(rx + r, ry + ph);
+    c.quadraticCurveTo(rx, ry + ph, rx, ry + ph - r);
+    c.lineTo(rx, ry + r);
+    c.quadraticCurveTo(rx, ry, rx + r, ry);
+    c.closePath();
+    c.fill();
+    c.fillStyle = "#dff5ff";
+    c.fillText(statusText, tx, ty);
+    c.restore();
+  }
+
+  function drawMobileScoreHud() {
+    if (!isMobile || !gameStarted) return;
+    const c = render.context;
+    const pr = renderPixelRatio;
+    c.save();
+    c.setTransform(pr, 0, 0, pr, 0, 0);
+
+    const cx = W / 2;
+    const ty = 8;
+    const barW = Math.min(300, W - 40);
+    const barH = 42;
+    const bx = cx - barW / 2;
+
+    c.globalAlpha = 0.8;
+    c.fillStyle = "rgba(10, 30, 50, 0.7)";
+    const r = 10;
+    c.beginPath();
+    c.moveTo(bx + r, ty);
+    c.lineTo(bx + barW - r, ty);
+    c.quadraticCurveTo(bx + barW, ty, bx + barW, ty + r);
+    c.lineTo(bx + barW, ty + barH - r);
+    c.quadraticCurveTo(bx + barW, ty + barH, bx + barW - r, ty + barH);
+    c.lineTo(bx + r, ty + barH);
+    c.quadraticCurveTo(bx, ty + barH, bx, ty + barH - r);
+    c.lineTo(bx, ty + r);
+    c.quadraticCurveTo(bx, ty, bx + r, ty);
+    c.closePath();
+    c.fill();
+
+    c.globalAlpha = 1;
+    c.textBaseline = "middle";
+    const midY = ty + barH / 2;
+
+    c.font = "bold 17px 'Trebuchet MS', sans-serif";
+    c.textAlign = "left";
+    c.fillStyle = teams[0].color;
+    c.fillText("P1", bx + 14, midY);
+    c.fillStyle = "#fff";
+    c.fillText(String(teams[0].score), bx + 40, midY);
+
+    c.textAlign = "center";
+    c.fillStyle = "rgba(180, 210, 230, 0.7)";
+    c.font = "bold 14px 'Trebuchet MS', sans-serif";
+    const endText = `END ${Math.min(currentEnd, totalEnds)}`;
+    c.fillText(endText, cx, midY - 7);
+    c.font = "12px 'Trebuchet MS', sans-serif";
+    c.fillStyle = "#f5c542";
+    const hammerLabel = hammerTeamIdx === 0 ? "P1" : (usaIsAI ? "AI" : "P2");
+    c.fillText(`🔨 ${hammerLabel}`, cx, midY + 10);
+
+    c.font = "bold 17px 'Trebuchet MS', sans-serif";
+    c.textAlign = "right";
+    c.fillStyle = teams[1].color;
+    c.fillText(usaIsAI ? "AI" : "P2", bx + barW - 38, midY);
+    c.fillStyle = "#fff";
+    c.fillText(String(teams[1].score), bx + barW - 14, midY);
+
+    const gbLeft = stonesPerTeam - teams[0].count;
+    const usaLeft = stonesPerTeam - teams[1].count;
+    const dotR = 4;
+    const dotY = ty + barH + 6;
+    c.globalAlpha = 0.6;
+    for (let i = 0; i < gbLeft; i++) {
+      c.fillStyle = teams[0].color;
+      c.beginPath();
+      c.arc(bx + 10 + i * (dotR * 2 + 2), dotY, dotR, 0, Math.PI * 2);
+      c.fill();
+    }
+    for (let i = 0; i < usaLeft; i++) {
+      c.fillStyle = teams[1].color;
+      c.beginPath();
+      c.arc(bx + barW - 10 - i * (dotR * 2 + 2), dotY, dotR, 0, Math.PI * 2);
+      c.fill();
+    }
+
+    c.restore();
+  }
+
+  function drawMiniMap() {
+    if (!gameStarted || done) return;
+    if (shotReleased || !chargingStone) return;
+    const c = render.context;
+    const pr = renderPixelRatio;
+    c.save();
+    c.setTransform(pr, 0, 0, pr, 0, 0);
+    c.globalAlpha = 0.35;
+
+    const ox = miniMapCenterX - house.x;
+    const oy = miniMapCenterY - house.y;
+    c.translate(ox, oy);
+
+    for (let i = 0; i < house.rings.length; i++) {
+      c.beginPath();
+      c.fillStyle = houseRingFillColors[i];
+      c.arc(house.x, house.y, house.rings[i], 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = houseRingEdgeColors[i];
+      c.lineWidth = 1;
+      c.stroke();
+    }
+
+    if (centerTargetImage.complete && centerTargetImage.naturalWidth > 0) {
+      const centerR = house.rings[3];
+      const maxBox = centerR * 1.9;
+      const iw = centerTargetImage.naturalWidth;
+      const ih = centerTargetImage.naturalHeight;
+      const s = Math.min(maxBox / iw, maxBox / ih);
+      const dw = iw * s;
+      const dh = ih * s;
+      c.save();
+      c.beginPath();
+      c.arc(house.x, house.y, centerR * 0.98, 0, Math.PI * 2);
+      c.clip();
+      c.globalAlpha = 0.3;
+      c.drawImage(centerTargetImage, house.x - dw * 0.5, house.y - dh * 0.5, dw, dh);
+      c.restore();
+    }
+
+    c.strokeStyle = "rgba(0, 0, 0, 0.1)";
+    c.lineWidth = 1;
+    c.beginPath();
+    c.moveTo(house.x - house.rings[0], house.y);
+    c.lineTo(house.x + house.rings[0], house.y);
+    c.stroke();
+    c.beginPath();
+    c.moveTo(house.x, house.y - house.rings[0]);
+    c.lineTo(house.x, house.y + house.rings[0]);
+    c.stroke();
+
+    c.globalAlpha = 0.7;
+    for (const stone of allStones) {
+      const team = teams[stone.plugin.teamIdx];
+      const r = stone.circleRadius || stoneRadius;
+      c.beginPath();
+      c.fillStyle = team.color;
+      c.strokeStyle = "rgba(0,0,0,0.4)";
+      c.lineWidth = 1.5;
+      c.arc(stone.position.x, stone.position.y, r, 0, Math.PI * 2);
+      c.fill();
+      c.stroke();
+    }
+
     c.restore();
   }
 
@@ -772,6 +1024,7 @@
       spinStrength: 0,
       handleAngle: 0,
       hitDampingTime: 0,
+      hitCount: 0,
       releasedAt: 0,
     };
     Body.setMass(stone, 10);
@@ -797,7 +1050,6 @@
     }
     const teamIdx = nextTeamIdx;
     const team = teams[teamIdx];
-    // New stone always starts centered; player can then aim left/right.
     pointerTargetX = sheet.x;
     pointer.x = sheet.x;
     const x = sheet.x;
@@ -812,7 +1064,10 @@
     chargeStartAt = 0;
     pointerTargetX = clampAimX(pointerTargetX);
     pointer.x = clampAimX(pointer.x);
-    updateUi("Aim with mouse or arrows. Hold Space to charge, release Space to throw.");
+    for (const s of allStones) s.plugin.hitCount = 0;
+    updateUi(isMobile ? "" : "Aim with arrows. Space to charge & release. V to peek at house.");
+    const ta = document.getElementById("touchAction");
+    if (ta) ta.textContent = "HOLD";
     if (teamIdx === 1 && usaIsAI && !done) aiTakeTurn();
   }
 
@@ -825,7 +1080,6 @@
     const limitedNorm = Math.max(-1, Math.min(1, lateralNorm));
     const spinNorm = Math.max(-maxSpinInfluence, Math.min(maxSpinInfluence, limitedNorm));
 
-    // Bounded release power curve: realistic cap, no excessive over-boost.
     const power = Math.max(minReleaseCharge, Math.min(1, charge));
     const curvedPower = Math.pow(power, 1.05);
     const launchVX = 0;
@@ -845,7 +1099,7 @@
     chargeStartAt = 0;
     chargingStone = null;
 
-    updateUi("Stone released. Tap Space rapidly to sweep.");
+    updateUi(isMobile ? "" : "Stone released. Tap Space rapidly to sweep.");
   }
 
   function stoneSpeed(stone) {
@@ -875,10 +1129,9 @@
 
     awaitingNextShotReset = true;
     cameraResetRequested = false;
-    updateUi("Shot finished. Press Space to scroll back for next stone.");
+    updateUi(isMobile ? "" : "Shot finished. Press Space to scroll back for next stone.");
 
-    // Auto-advance camera when AI is involved (either AI just shot, or AI is up next).
-    if (shotTeamIdx === 1 || (nextTeamIdx === 1 && usaIsAI)) {
+    if (nextTeamIdx === 1 && usaIsAI) {
       setTimeout(() => {
         if (awaitingNextShotReset && !cameraResetRequested) {
           cameraResetRequested = true;
@@ -899,7 +1152,7 @@
     shotReleased = false;
     scrub = 0;
     awaitingAllStonesStop = true;
-    allStoppedFrames = 0;
+    allStoppedSince = 0;
     updateUi(statusText || "Waiting for all stones to stop...");
   }
 
@@ -918,8 +1171,8 @@
     clearAllStones();
     teams[0].count = 0;
     teams[1].count = 0;
-    nextTeamIdx = 0;
-    turnIndex = 0;
+    nextTeamIdx = hammerTeamIdx === 0 ? 1 : 0;
+    turnIndex = nextTeamIdx;
     totalShots = 0;
     activeStone = null;
     chargingStone = null;
@@ -931,7 +1184,7 @@
     scrub = 0;
     lastSweepInputAt = 0;
     awaitingAllStonesStop = false;
-    allStoppedFrames = 0;
+    allStoppedSince = 0;
     awaitingNextShotReset = false;
     awaitingNextEndKey = false;
     pendingNextEndSetup = false;
@@ -994,7 +1247,6 @@
       const dx = ax - bx;
       const dy = ay - by;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      // Use visual-size-aware threshold so sweeping is blocked before stones appear to overlap.
       const blockDist = Math.max(ar, br) * sweepBlockMultiplier;
       if (dist <= blockDist) return true;
     }
@@ -1020,24 +1272,22 @@
         stageNextEnd(scoredMsg, []);
         return;
       }
-
-      done = true;
-      if (teams[0].score > teams[1].score) {
-        winnerTeamIdx = 0;
-      } else if (teams[1].score > teams[0].score) {
-        winnerTeamIdx = 1;
-      } else {
-        winnerTeamIdx = null;
+      if (teams[0].score === teams[1].score) {
+        totalEnds += 1;
+        stageNextEnd(`${scoredMsg} Tied! Extra end.`, []);
+        return;
       }
+      done = true;
+      winnerTeamIdx = teams[0].score > teams[1].score ? 0 : 1;
       updateUi(`${scoredMsg} Match finished.`);
       return;
     }
 
     const winningTeam = scoringStones[0].team;
+    const winningTeamIdx = teams.indexOf(winningTeam);
     const nearestOpponentDist =
       scoringStones.find((x) => x.team !== winningTeam)?.dist ?? Infinity;
 
-    // Curling end scoring: winner gets one point per stone closer than opponent's nearest.
     const epsilon = 1e-6;
     const points = scoringStones.filter(
       (x) => x.team === winningTeam && x.dist + epsilon < nearestOpponentDist
@@ -1045,25 +1295,23 @@
     const pointStones = scoringStones
       .filter((x) => x.team === winningTeam && x.dist + epsilon < nearestOpponentDist)
       .map((x) => x.stone);
+    hammerTeamIdx = 1 - winningTeamIdx;
     const scoredMsg = `End ${currentEnd} complete. ${winningTeam.name} scores ${points}.`;
 
-    // Animate score: increment one point at a time with a bell sound.
     let awarded = 0;
     function tickScore() {
       if (awarded >= points) {
-        // All points awarded — proceed with end/game flow.
         if (currentEnd < totalEnds) {
           stageNextEnd(scoredMsg, pointStones);
         } else {
-          done = true;
-          if (teams[0].score > teams[1].score) {
-            winnerTeamIdx = 0;
-          } else if (teams[1].score > teams[0].score) {
-            winnerTeamIdx = 1;
+          if (teams[0].score === teams[1].score) {
+            totalEnds += 1;
+            stageNextEnd(`${scoredMsg} Tied! Extra end.`, pointStones);
           } else {
-            winnerTeamIdx = null;
+            done = true;
+            winnerTeamIdx = teams[0].score > teams[1].score ? 0 : 1;
+            updateUi(`${scoredMsg} Match finished.`);
           }
-          updateUi(`${scoredMsg} Match finished.`);
         }
         return;
       }
@@ -1076,10 +1324,12 @@
     tickScore();
   }
 
-  function updateUi(statusText) {
-    void statusText;
+  function updateUi(text) {
+    if (text && text !== statusText) {
+      statusText = text;
+      statusTextSetAt = performance.now();
+    }
     updateStonesLeftTable();
-    // Highlight the active player's row.
     if (ui.rowP1) ui.rowP1.classList.toggle("active-turn", nextTeamIdx === 0 && !done);
     if (ui.rowP2) ui.rowP2.classList.toggle("active-turn", nextTeamIdx === 1 && !done);
   }
@@ -1087,15 +1337,31 @@
   function renderDots(el, count, dotClass) {
     if (!el) return;
     const safeCount = Math.max(0, Math.min(stonesPerTeam, count));
-    el.innerHTML = "";
-    const wrap = document.createElement("div");
-    wrap.className = "dots";
-    for (let i = 0; i < safeCount; i += 1) {
-      const dot = document.createElement("span");
-      dot.className = `dot ${dotClass}`;
-      wrap.appendChild(dot);
+    const wrap = el.querySelector(".dots");
+    if (!wrap) {
+      el.innerHTML = "";
+      const w = document.createElement("div");
+      w.className = "dots";
+      for (let i = 0; i < safeCount; i += 1) {
+        const dot = document.createElement("span");
+        dot.className = `dot ${dotClass}`;
+        w.appendChild(dot);
+      }
+      el.appendChild(w);
+      return;
     }
-    el.appendChild(wrap);
+    const currentCount = wrap.children.length;
+    if (safeCount < currentCount) {
+      const removing = wrap.children[currentCount - 1];
+      removing.classList.add("dot-spin-out");
+      removing.addEventListener("animationend", () => removing.remove(), { once: true });
+    } else if (safeCount > currentCount) {
+      for (let i = currentCount; i < safeCount; i += 1) {
+        const dot = document.createElement("span");
+        dot.className = `dot ${dotClass}`;
+        wrap.appendChild(dot);
+      }
+    }
   }
 
   function updateStonesLeftTable() {
@@ -1133,6 +1399,10 @@
       if (ui.endBadge) ui.endBadge.textContent = String(shownEnd);
       uiState.endShown = shownEnd;
     }
+    const hammerEl = document.getElementById("hammerIndicator");
+    if (hammerEl) hammerEl.textContent = `🔨 ${teams[hammerTeamIdx].short}`;
+    const totalEndsEl = document.getElementById("totalEndsBadge");
+    if (totalEndsEl) totalEndsEl.textContent = String(totalEnds);
   }
 
   function restartMatchFromEnd() {
@@ -1142,6 +1412,8 @@
     teams[0].score = 0;
     teams[1].score = 0;
     currentEnd = 1;
+    totalEnds = 5;
+    hammerTeamIdx = 1;
     nextTeamIdx = 0;
     turnIndex = 0;
     totalShots = 0;
@@ -1158,7 +1430,12 @@
     awaitingNextEndKey = false;
     cameraResetRequested = false;
     awaitingAllStonesStop = false;
-    allStoppedFrames = 0;
+    allStoppedSince = 0;
+    pendingNextEndSetup = false;
+    endFlashActive = false;
+    endFlashStartedAt = 0;
+    endFlashPromptText = "";
+    endFlashStoneIds.clear();
     cameraY = 0;
     done = false;
     aiActive = false;
@@ -1173,8 +1450,6 @@
     spawnNextStone();
   }
 
-  // ===== AI Opponent (USA / Team 1) =====
-
   const usaLabelEl = document.getElementById("usaLabel");
 
   function updateUsaLabel() {
@@ -1184,6 +1459,7 @@
   function toggleUsaAI() {
     usaIsAI = !usaIsAI;
     updateUsaLabel();
+    playBellSound();
   }
 
   function gaussianRandom(mean, stddev) {
@@ -1418,7 +1694,8 @@
         spaceHeld = true;
         isCharging = true;
         chargeStartAt = performance.now();
-        const chargeTime = shot.power * powerRampUpMs;
+        const aiPower = isMobile ? Math.min(1, shot.power * 1.2) : shot.power;
+        const chargeTime = aiPower * powerRampUpMs;
         setTimeout(() => {
           if (done || shotReleased) { aiActive = false; return; }
           spaceHeld = false;
@@ -1456,14 +1733,8 @@
             aiActive = false;
             return;
           }
-          if (awaitingNextEndKey && !endFlashActive) {
-            setTimeout(() => {
-              if (done) { aiActive = false; return; }
-              if (pendingNextEndSetup) resetForNextEnd();
-              awaitingNextEndKey = false;
-              cameraResetRequested = true;
-              aiActive = false;
-            }, 1500);
+          if (awaitingNextEndKey) {
+            aiActive = false;
             return;
           }
           setTimeout(check, 100);
@@ -1478,11 +1749,9 @@
   function updatePointerFromEvent(e) {
     if (aiActive) return;
     const targetX = clampAimX(e.clientX);
-    // Dampen direct mouse/trackpad aim to reduce sensitivity.
     pointerTargetX += (targetX - pointerTargetX) * 0.18;
   }
 
-  // Use pointer events only to avoid duplicate mouse+pointer updates.
   window.addEventListener("pointermove", updatePointerFromEvent);
 
   function isSpaceEvent(e) {
@@ -1508,6 +1777,11 @@
       if (pendingNextEndSetup) resetForNextEnd();
       awaitingNextEndKey = false;
       cameraResetRequested = true;
+      return;
+    }
+    if (e.key === "v" || e.key === "V") {
+      e.preventDefault();
+      houseViewHeld = true;
       return;
     }
     if (e.code === "ArrowLeft") {
@@ -1550,6 +1824,10 @@
     if (!gameStarted || done) return;
     if (aiActive) return;
     if (performance.now() < postEndInputLockUntil) return;
+    if (e.key === "v" || e.key === "V") {
+      houseViewHeld = false;
+      return;
+    }
     if (e.code === "ArrowLeft") {
       e.preventDefault();
       aimLeftHeld = false;
@@ -1581,6 +1859,7 @@
     spaceHeld = false;
     aimLeftHeld = false;
     aimRightHeld = false;
+    houseViewHeld = false;
     if (isCharging && !shotReleased && chargingStone) releaseStone();
   });
 
@@ -1591,6 +1870,118 @@
   render.canvas.tabIndex = 0;
   render.canvas.focus();
   document.body.style.overscrollBehavior = "none";
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      if (audioCtx && audioCtx.state === "running") audioCtx.suspend();
+      spaceHeld = false;
+      aimLeftHeld = false;
+      aimRightHeld = false;
+      houseViewHeld = false;
+      if (isCharging && !shotReleased && chargingStone) releaseStone();
+    } else {
+      if (audioCtx && audioCtx.state === "suspended" && gameStarted) audioCtx.resume();
+    }
+  });
+
+  const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+  if (isTouchDevice) {
+    const modeToggle = document.querySelector(".mode-toggle");
+    if (modeToggle) modeToggle.style.display = "none";
+
+    let canvasTouchId = null;
+    let canvasTouchStartX = 0;
+    render.canvas.addEventListener("touchstart", (e) => {
+      if (!gameStarted) return;
+      if (done) { restartMatchFromEnd(); return; }
+      const t0 = e.changedTouches[0];
+      const scoreBarW = Math.min(300, W - 40);
+      const scoreBarX = W / 2 - scoreBarW / 2;
+      if (t0.clientY < 50 && t0.clientX > scoreBarX + scoreBarW * 0.65) {
+        toggleUsaAI();
+        return;
+      }
+      if (aiActive || endFlashActive) return;
+      if (performance.now() < postEndInputLockUntil) return;
+      if (awaitingNextEndKey) {
+        if (pendingNextEndSetup) resetForNextEnd();
+        awaitingNextEndKey = false;
+        cameraResetRequested = true;
+        return;
+      }
+      if (awaitingNextShotReset) {
+        cameraResetRequested = true;
+        return;
+      }
+      if (shotReleased && activeStone) {
+        if (!isSweepBlockedForActiveStone()) {
+          scrub = Math.max(0, Math.min(2.2, scrub + 0.5));
+          lastSweepInputAt = performance.now();
+        }
+        return;
+      }
+      if (chargingStone && !shotReleased && !isCharging) {
+        spaceHeld = true;
+        isCharging = true;
+        chargeStartAt = performance.now();
+      }
+      if (canvasTouchId !== null) return;
+      const t = e.changedTouches[0];
+      canvasTouchId = t.identifier;
+      canvasTouchStartX = t.clientX;
+    }, { passive: true });
+    render.canvas.addEventListener("touchmove", (e) => {
+      for (const t of e.changedTouches) {
+        if (t.identifier !== canvasTouchId) continue;
+        const dx = t.clientX - canvasTouchStartX;
+        canvasTouchStartX = t.clientX;
+        if (!shotReleased && chargingStone && !aiActive) {
+          pointerTargetX = clampAimX(pointerTargetX + dx * 0.8);
+        }
+      }
+    }, { passive: true });
+    render.canvas.addEventListener("touchend", (e) => {
+      for (const t of e.changedTouches) {
+        if (t.identifier === canvasTouchId) canvasTouchId = null;
+      }
+      if (isCharging && chargingStone && !shotReleased) {
+        spaceHeld = false;
+        releaseStone();
+      }
+    });
+    render.canvas.addEventListener("touchcancel", () => {
+      canvasTouchId = null;
+      if (isCharging && chargingStone && !shotReleased) {
+        spaceHeld = false;
+        releaseStone();
+      }
+    });
+
+    let peekTimeout = null;
+    render.canvas.addEventListener("touchstart", (e) => {
+      if (e.touches.length === 2) {
+        houseViewHeld = true;
+        return;
+      }
+      peekTimeout = setTimeout(() => {
+        if (!shotReleased && chargingStone && !aiActive) {
+          houseViewHeld = true;
+        }
+      }, 500);
+    }, { passive: true });
+    render.canvas.addEventListener("touchmove", () => {
+      clearTimeout(peekTimeout);
+    }, { passive: true });
+    render.canvas.addEventListener("touchend", (e) => {
+      clearTimeout(peekTimeout);
+      if (e.touches.length < 2) houseViewHeld = false;
+    });
+    render.canvas.addEventListener("touchcancel", () => {
+      clearTimeout(peekTimeout);
+      houseViewHeld = false;
+    });
+
+  }
 
   Events.on(engine, "beforeUpdate", () => {
     if (done) return;
@@ -1613,7 +2004,7 @@
     if (!shotReleased) {
       const aimInput = (aimRightHeld ? 1 : 0) - (aimLeftHeld ? 1 : 0);
       if (aimInput !== 0) {
-        const keyAimSpeed = 150; // px/sec
+        const keyAimSpeed = 150;
         pointerTargetX = clampAimX(pointerTargetX + aimInput * keyAimSpeed * frameDt);
       }
       const smoothing = aimInput !== 0 ? 0.2 : 0.32;
@@ -1645,7 +2036,7 @@
         const downT = (phase - powerRampUpMs - powerHoldMs) / powerRampDownMs;
         charge = Math.max(0, 1 - downT);
       }
-      updateUi("Charging... release Space to throw.");
+      if (!isMobile) updateUi("Charging... release Space to throw.");
     }
 
     if (shotReleased && activeStone) {
@@ -1656,15 +2047,13 @@
         const sweepBlocked = isSweepBlockedForActiveStone();
         if (sweepBlocked) scrub = 0;
         const effectiveScrub = sweepBlocked || !sweepTouchActive ? 0 : scrub;
-        // Smooth down-screen glide on ice: kill lateral drift, gently decay forward speed.
         // All per-frame multipliers scaled by dtRatio for frame-rate independence.
         const sweepFactor = Math.min(1, effectiveScrub / 2.2);
         let nextVX = v.x * Math.pow(0.8, dtRatio);
-        const forwardFriction = 0.0036 * (1 - 0.05 * sweepFactor) * dtRatio;
-        const glideRetention = Math.pow(0.9976 + 0.00012 * sweepFactor, dtRatio);
+        const forwardFriction = 0.0036 * (1 - 0.0525 * sweepFactor) * dtRatio;
+        const glideRetention = Math.pow(0.9976 + 0.000126 * sweepFactor, dtRatio);
         let nextVY = Math.max(0, v.y * glideRetention - forwardFriction);
 
-        // Subtle curl: direction depends on release side, strength scales with offset from center.
         const speedNorm = Math.min(1, speed / 8);
         const lateCurl = 0.7 + 0.9 * (1 - speedNorm);
         const offsetBoost = activeStone.plugin.spinStrength * activeStone.plugin.spinStrength;
@@ -1678,7 +2067,7 @@
         nextVX += curlDelta * dtRatio;
 
         if (effectiveScrub > 0.01) {
-          nextVY += 0.00022 * effectiveScrub * dtRatio;
+          nextVY += 0.000231 * effectiveScrub * dtRatio;
         }
         nextVX = Math.max(-1.2, Math.min(1.2, nextVX));
         nextVY = Math.max(0, nextVY);
@@ -1705,7 +2094,6 @@
       maybeEndShot();
     }
 
-    // Apply ice-slide damping to every other moving stone so hit stones do not coast unrealistically.
     for (const stone of allStones) {
       if (stone === activeStone) continue;
       const v = stone.velocity;
@@ -1713,10 +2101,13 @@
       if (speed < 0.001) continue;
 
       let nextVX = v.x * Math.pow(0.925, dtRatio);
-      let nextVY = Math.max(0, v.y * Math.pow(0.998, dtRatio) - 0.0034 * dtRatio);
+      let nextVY = Math.max(0, v.y * Math.pow(0.997, dtRatio) - 0.0036 * dtRatio);
       if (stone.plugin.hitDampingTime > 0) {
-        nextVX *= Math.pow(0.97, dtRatio);
-        nextVY *= Math.pow(0.98, dtRatio);
+        const hits = Math.min(stone.plugin.hitCount, 4);
+        const dampX = Math.max(0.90, 0.97 - (hits - 1) * 0.025);
+        const dampY = Math.max(0.92, 0.98 - (hits - 1) * 0.02);
+        nextVX *= Math.pow(dampX, dtRatio);
+        nextVY *= Math.pow(dampY, dtRatio);
         stone.plugin.hitDampingTime -= frameDt;
       }
       if (nextVY < 0.16 && Math.abs(nextVX) < 0.12) {
@@ -1739,14 +2130,15 @@
     }
 
     if (awaitingAllStonesStop) {
+      const now = performance.now();
       if (areAllStonesStopped()) {
-        allStoppedFrames += 1;
-        if (allStoppedFrames >= 8) {
+        if (!allStoppedSince) allStoppedSince = now;
+        if (now - allStoppedSince >= 133) {
           awaitingAllStonesStop = false;
           completeShotAndAdvanceTurn();
         }
       } else {
-        allStoppedFrames = 0;
+        allStoppedSince = 0;
       }
     }
 
@@ -1761,11 +2153,13 @@
     }
 
     const maxCameraY = Math.max(0, sheet.top + sheet.height - H - bottomPad);
-    if (shotReleased && activeStone) {
+    if (houseViewHeld && chargingStone && !shotReleased && !aiActive) {
+      const targetViewY = house.y - H * 0.58;
+      cameraY += (targetViewY - cameraY) * (1 - Math.pow(1 - 0.12, dtRatio));
+    } else if (shotReleased && activeStone) {
       const desiredY = activeStone.position.y - H * 0.68;
       cameraY += (desiredY - cameraY) * (1 - Math.pow(1 - 0.09, dtRatio));
     } else if (cameraResetRequested) {
-      // Smooth, slower return to hack/top for the next player's turn.
       cameraY += (0 - cameraY) * (1 - Math.pow(1 - 0.045, dtRatio));
       if (Math.abs(cameraY) < 1.2) {
         cameraY = 0;
@@ -1774,7 +2168,6 @@
         spawnNextStone();
       }
     } else if (awaitingAllStonesStop || awaitingNextShotReset || awaitingNextEndKey) {
-      // After each shot, drift to the house so players can review current stone positions.
       const targetViewY = house.y - H * 0.58;
       cameraY += (targetViewY - cameraY) * (1 - Math.pow(1 - 0.03, dtRatio));
     }
@@ -1794,26 +2187,51 @@
       const b = pair.bodyB;
       if (!a.label.startsWith("stone-") || !b.label.startsWith("stone-")) continue;
 
-      // Damped heavy-stone contact: reduce post-impact translational and spin energy.
       const av = a.velocity;
       const bv = b.velocity;
       const impact = Vector.magnitude(Vector.sub(av, bv));
       playCollisionSound(impact);
-      Body.setVelocity(a, { x: av.x * 0.82, y: Math.max(0, av.y * 0.89) });
-      Body.setVelocity(b, { x: bv.x * 0.82, y: Math.max(0, bv.y * 0.89) });
+      const midX = (a.position.x + b.position.x) / 2;
+      const midY = (a.position.y + b.position.y) / 2;
+      spawnCollisionParticles(midX, midY, impact);
+      shakeIntensity = Math.min(8, impact * 1.2);
+      if (a.plugin) a.plugin.hitCount += 1;
+      if (b.plugin) b.plugin.hitCount += 1;
+      const aHits = a.plugin ? a.plugin.hitCount : 1;
+      const bHits = b.plugin ? b.plugin.hitCount : 1;
+      const aDamp = Math.max(0.70, 0.94 - (aHits - 1) * 0.06);
+      const bDamp = Math.max(0.70, 0.94 - (bHits - 1) * 0.06);
+      const aFwd = Math.max(0.75, 0.96 - (aHits - 1) * 0.05);
+      const bFwd = Math.max(0.75, 0.96 - (bHits - 1) * 0.05);
+      Body.setVelocity(a, { x: av.x * aDamp, y: Math.max(0, av.y * aFwd) });
+      Body.setVelocity(b, { x: bv.x * bDamp, y: Math.max(0, bv.y * bFwd) });
       Body.setAngularVelocity(a, a.angularVelocity * 0.76);
       Body.setAngularVelocity(b, b.angularVelocity * 0.76);
-      if (a.plugin) a.plugin.hitDampingTime = 2 / 60;
-      if (b.plugin) b.plugin.hitDampingTime = 2 / 60;
+      if (a.plugin) a.plugin.hitDampingTime = 15 / 60;
+      if (b.plugin) b.plugin.hitDampingTime = 15 / 60;
     }
   });
 
   Events.on(render, "afterRender", () => {
+    if (shakeIntensity > 0.1) {
+      shakeX = (Math.random() - 0.5) * shakeIntensity * 2;
+      shakeY = (Math.random() - 0.5) * shakeIntensity * 2;
+      shakeIntensity *= 0.82;
+    } else {
+      shakeX = 0;
+      shakeY = 0;
+      shakeIntensity = 0;
+    }
+    render.context.save();
+    render.context.translate(shakeX, shakeY);
     Render.startViewTransform(render);
     drawIceBase();
     drawSheetDecor();
     drawStonesOverlay();
     drawSweepGhost();
+    drawAimGuide();
+    updateParticles(1 / 60);
+    drawParticles();
 
     const c = render.context;
     c.save();
@@ -1824,10 +2242,9 @@
       const maxH = startLineY - my;
       const level = Math.max(0, Math.min(1, charge));
       const fillH = Math.max(4, maxH * level);
-      const topW = 6;
-      const botW = topW + 12 * level;
+      const topW = isMobile ? 12 : 6;
+      const botW = topW + (isMobile ? 22 : 12) * level;
 
-      // Growing tapered bar — narrow at top, widens toward bottom.
       const bandGrad = c.createLinearGradient(0, my, 0, my + maxH);
       bandGrad.addColorStop(0, "rgba(255, 236, 74, 0.98)");
       bandGrad.addColorStop(0.52, "rgba(255, 160, 44, 0.98)");
@@ -1846,7 +2263,6 @@
       c.fill();
       c.stroke();
 
-      // Soft gloss highlight along left edge.
       c.fillStyle = "rgba(255, 255, 255, 0.18)";
       c.beginPath();
       const glossBot = my + fillH * 0.4;
@@ -1861,9 +2277,9 @@
 
     c.restore();
     Render.endViewTransform(render);
+    render.context.restore();
 
     if (done) {
-      // Keep winner visuals centered over the ice sheet area.
       const cx = sheet.x;
       const cy = H * 0.46;
       const t = performance.now();
@@ -1929,6 +2345,9 @@
       c.restore();
     }
 
+    drawMiniMap();
+    drawMobileScoreHud();
+    drawStatusOverlay();
   });
 
   window.addEventListener("resize", () => {
@@ -1938,21 +2357,34 @@
   function startGame() {
     if (gameStarted) return;
     gameStarted = true;
+    document.body.style.touchAction = "none";
+    document.documentElement.style.touchAction = "none";
+    render.canvas.style.touchAction = "none";
     initAudio();
     if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
     if (titleScreenEl) titleScreenEl.classList.add("hidden");
     if (hudEl) hudEl.classList.add("ready");
     spawnNextStone();
     Render.run(render);
-    Runner.run(runner, engine);
+    const fixedDt = 1000 / 60;
+    let lastUpdate = performance.now();
+    let accumulator = 0;
+    function gameLoop() {
+      const now = performance.now();
+      accumulator += now - lastUpdate;
+      lastUpdate = now;
+      if (accumulator > 100) accumulator = 100;
+      while (accumulator >= fixedDt) {
+        Engine.update(engine, fixedDt);
+        accumulator -= fixedDt;
+      }
+      requestAnimationFrame(gameLoop);
+    }
+    requestAnimationFrame(gameLoop);
   }
 
-  function startFromAnyInput() {
-    startGame();
-  }
-
-  window.addEventListener("keydown", startFromAnyInput, { once: true });
-  window.addEventListener("mousedown", startFromAnyInput, { once: true });
-  window.addEventListener("touchstart", startFromAnyInput, { once: true });
+  window.addEventListener("keydown", () => startGame(), { once: true });
+  window.addEventListener("mousedown", () => startGame(), { once: true });
+  window.addEventListener("touchstart", () => startGame(), { once: true });
   updateStonesLeftTable();
 })();

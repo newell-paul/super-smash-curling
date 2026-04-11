@@ -23,3 +23,12 @@ node_modules/
 # Temp
 tmp/
 *.tmp
+
+# Claude
+CLAUDE.md
+
+# Archives
+*.zip
+
+# Dev tools
+nocache-server.py

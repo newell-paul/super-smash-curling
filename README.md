@@ -2,6 +2,8 @@
 
 A playable browser-based curling proof of concept inspired by winter curling competition gameplay.
 
+Now mobile friendly!
+
 
 ## Title page
 
@@ -16,7 +18,7 @@ Play game here!
 https://newell-paul.github.io/super-smash-curling/
 
 
-Version: `0.4`
+Version: `0.5`
 
 This project uses:
 - HTML/CSS for HUD and presentation
@@ -26,7 +28,7 @@ This project uses:
 ## Features
 
 - Birds-eye curling sheet with scrolling camera
-- Two teams: `GB` (red) vs `USA` (yellow)
+- Two teams: `GB` (red) vs `USA` (yellow) 
 - Match flow: **3 ends**, **6 stones per team per end**
 - Mouse + arrow-key aiming
 - Space-bar hold/release power system with visual meter
@@ -42,6 +44,10 @@ This project uses:
 - `Space (release)`: Throw stone
 - `Space (tap repeatedly after release)`: Sweep
 - `Any key` at end-of-end/game-over: Continue / restart flow
+
+## Mobile
+
+- Use touch controls to aim and swipe to sweep on stone
 
 ## Scoring Rules Implemented
 
@@ -106,23 +112,13 @@ If you do not want a `docs/` folder, you can also paste GitHub-hosted asset URLs
 ## Roadmap
 
 - Improve stone-vs-stone collision feel with more tuning presets.
-- Add optional scoreboard animation polish and end transition effects.
-- Add configurable match setup (ends/stones) via UI.
-- Add sound on/off and volume sliders in HUD.
-- Expand tests to cover turn-order and end-transition edge cases.
-- Add mobile/tablet control profile.
 
 ## Notes
 
-- Matter.js is loaded from CDN in `index.html`.
-- If a browser blocks CDN scripts, allow network access for the page and reload.
+- Matter.js is bundled locally in `vendor/matter.min.js`.
 - This is a POC focused on playability and feel rather than full competition-rule coverage.
 
 ## GitHub Pages
 
 This repo includes a GitHub Actions Pages workflow at `.github/workflows/pages.yml`.
 
-After pushing to GitHub:
-1. Open repository `Settings` -> `Pages`.
-2. Set `Source` to `GitHub Actions`.
-3. Push to `master` or `main`.
