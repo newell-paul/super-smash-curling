@@ -1,9 +1,11 @@
 # Super Smash Curling
 
-A playable browser-based curling proof of concept inspired by winter curling competition gameplay.
+Inspired by the start of a GB curling match in the 2026 Winter Olympics on a rainy Sunday morning. 
+I decided to see if I could I spin up a working Curling game in Claude Code by the time the match finished?
+
+90% of this game was completed in under 2 hours. I have since tweaked the visuals and the physics.
 
 Now mobile friendly!
-
 
 ## Title page
 
